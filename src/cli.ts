@@ -186,7 +186,7 @@ web
         const { done, value } = await reader.read();
         if (done) break;
         input += new TextDecoder().decode(value);
-        if (input.includes("\\n")) break;
+        if (input.includes("\n")) break;
       }
       reader.releaseLock();
       const inputPort = parseInt(input.trim(), 10);
