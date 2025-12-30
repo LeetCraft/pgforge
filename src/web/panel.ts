@@ -589,6 +589,29 @@ export const PANEL_HTML = `<!DOCTYPE html>
       navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard')).catch(() => toast('Failed to copy', 'error'));
     }
 
+    function copyExplorerUrl() {
+      const el = document.getElementById('explorer-url');
+      const btn = document.getElementById('explorer-copy-btn');
+      if (!el) return;
+      const text = el.textContent || el.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        if (btn) {
+          const span = btn.querySelector('span');
+          if (span) {
+            span.textContent = 'Copied!';
+            btn.classList.add('bg-emerald-500');
+            btn.classList.remove('bg-slate-900', 'hover:bg-slate-800');
+            setTimeout(() => {
+              span.textContent = 'Copy';
+              btn.classList.remove('bg-emerald-500');
+              btn.classList.add('bg-slate-900', 'hover:bg-slate-800');
+            }, 2000);
+          }
+        }
+        toast('Copied to clipboard');
+      }).catch(() => toast('Failed to copy', 'error'));
+    }
+
     // ===== RENDER =====
     function render() {
       const app = document.getElementById('app');
@@ -688,7 +711,7 @@ export const PANEL_HTML = `<!DOCTYPE html>
       return '<div class="fade-in h-[calc(100vh-48px)] flex flex-col max-w-6xl">' +
         '<div class="mb-4 flex-shrink-0"><div class="flex items-center justify-between">' +
         '<div><h1 class="text-lg font-semibold text-slate-900">' + escapeHtml(state.dbName) + '</h1><p class="text-slate-400 text-sm">Browse tables and data</p></div>' +
-        (db && connUrl ? '<button onclick="copyToClipboard(\\'' + escapeHtml(connUrl) + '\\')" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs text-slate-600 font-mono transition-colors">' + icons.link + '<span class="max-w-xs truncate">' + escapeHtml(connUrl) + '</span>' + icons.copy + '</button>' : '') +
+        (db && connUrl ? '<div class="flex items-center gap-2 max-w-lg"><div class="flex-1 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono overflow-x-auto whitespace-nowrap select-all" id="explorer-url">' + escapeHtml(connUrl) + '</div><button onclick="copyExplorerUrl()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors" id="explorer-copy-btn">' + icons.copy + '<span>Copy</span></button></div>' : '') +
         '</div>' +
         (db && db.status === 'running' ? '<div class="relative"><div id="live-indicator" class="absolute -top-1 right-0 flex items-center gap-1.5 text-[10px] text-emerald-600 opacity-0 transition-opacity duration-300"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Updated</div>' +
           '<div class="grid grid-cols-4 gap-3 mt-4">' +
