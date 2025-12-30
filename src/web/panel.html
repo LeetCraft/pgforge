@@ -417,7 +417,15 @@
     }
 
     /* Connection URL */
+    .connection-url-container {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+      margin-top: 8px;
+    }
+
     .connection-url {
+      flex: 1;
       background: #0f0f0f;
       border: 1px solid #2a2a2a;
       border-radius: 8px;
@@ -425,16 +433,102 @@
       font-family: monospace;
       font-size: 12px;
       word-break: break-all;
-      cursor: pointer;
       transition: all 0.2s;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .connection-url:hover {
+    .copy-btn {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 0 14px;
+      color: #e5e5e5;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .copy-btn:hover {
+      background: #3a3a3a;
       border-color: #6366f1;
     }
 
-    .connection-url.copied {
+    .copy-btn.copied {
+      background: #10b981;
       border-color: #10b981;
+      color: white;
+    }
+
+    .copy-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Success Modal */
+    .success-modal .modal {
+      max-width: 500px;
+    }
+
+    .success-icon {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 28px;
+    }
+
+    .success-modal h2 {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .success-modal p {
+      text-align: center;
+      color: #9ca3af;
+      margin-bottom: 20px;
+    }
+
+    .url-display {
+      background: #0f0f0f;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .url-display label {
+      display: block;
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .url-display .url-text {
+      font-family: monospace;
+      font-size: 13px;
+      word-break: break-all;
+      line-height: 1.5;
+      color: #e5e5e5;
+    }
+
+    .url-display .copy-btn-large {
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      justify-content: center;
+      font-size: 14px;
     }
 
     /* Toast */
@@ -589,6 +683,28 @@
     </div>
   </div>
 
+  <!-- Success Modal -->
+  <div id="successModal" class="modal-overlay success-modal">
+    <div class="modal">
+      <div class="success-icon">&#10003;</div>
+      <h2 id="successTitle">Database Created!</h2>
+      <p id="successMessage">Your database is ready to use.</p>
+      <div class="url-display">
+        <label>Connection URL</label>
+        <div class="url-text" id="successUrl"></div>
+        <button class="copy-btn copy-btn-large" id="successCopyBtn" onclick="copySuccessUrl()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <span>Copy URL</span>
+        </button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="hideSuccessModal()">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="toast"></div>
 
@@ -664,6 +780,11 @@
       }
     }
 
+    function buildConnectionUrl(db) {
+      const password = encodeURIComponent(db.password);
+      return `postgresql://${db.user}:${password}@${db.host}:${db.port}/${db.database}`;
+    }
+
     function renderDatabases(dbs) {
       const container = document.getElementById('databases');
 
@@ -677,7 +798,9 @@
         return;
       }
 
-      container.innerHTML = dbs.map(db => `
+      container.innerHTML = dbs.map(db => {
+        const url = buildConnectionUrl(db);
+        return `
         <div class="db-card">
           <div class="db-info">
             <div class="db-name">
@@ -689,8 +812,14 @@
               <span>Size: ${db.size || 'N/A'}</span>
               <span>Tables: ${db.tables || 0}</span>
             </div>
-            <div class="connection-url" onclick="copyUrl(this, '${db.url}')" title="Click to copy">
-              ${db.url}
+            <div class="connection-url-container">
+              <div class="connection-url">${url}</div>
+              <button class="copy-btn" onclick="copyUrl(this, '${url.replace(/'/g, "\\'")}')">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>Copy</span>
+              </button>
             </div>
           </div>
           <div class="db-actions">
@@ -700,7 +829,7 @@
             }
           </div>
         </div>
-      `).join('');
+      `}).join('');
     }
 
     async function createDatabase(e) {
@@ -721,15 +850,20 @@
           body: JSON.stringify({ name })
         });
 
+        const data = await res.json();
+
         if (!res.ok) {
-          const err = await res.json();
-          showToast(err.error || 'Failed to create database', 'error');
+          showToast(data.error || 'Failed to create database', 'error');
           return;
         }
 
         hideCreateModal();
-        showToast('Database created successfully', 'success');
         await loadDatabases();
+        showSuccessModal(
+          'Database Created!',
+          `Your database "${name}" is ready to use.`,
+          data.url
+        );
       } catch (err) {
         showToast('Failed to create database', 'error');
       } finally {
@@ -764,11 +898,51 @@
       }
     }
 
-    function copyUrl(el, url) {
-      navigator.clipboard.writeText(url);
-      el.classList.add('copied');
-      showToast('Copied to clipboard', 'success');
-      setTimeout(() => el.classList.remove('copied'), 2000);
+    function copyUrl(btn, url) {
+      navigator.clipboard.writeText(url).then(() => {
+        btn.classList.add('copied');
+        const span = btn.querySelector('span');
+        const originalText = span.textContent;
+        span.textContent = 'Copied!';
+        showToast('Copied to clipboard', 'success');
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          span.textContent = originalText;
+        }, 2000);
+      }).catch(() => {
+        showToast('Failed to copy', 'error');
+      });
+    }
+
+    let currentSuccessUrl = '';
+
+    function showSuccessModal(title, message, url) {
+      currentSuccessUrl = url;
+      document.getElementById('successTitle').textContent = title;
+      document.getElementById('successMessage').textContent = message;
+      document.getElementById('successUrl').textContent = url;
+      document.getElementById('successCopyBtn').classList.remove('copied');
+      document.getElementById('successCopyBtn').querySelector('span').textContent = 'Copy URL';
+      document.getElementById('successModal').classList.add('active');
+    }
+
+    function hideSuccessModal() {
+      document.getElementById('successModal').classList.remove('active');
+    }
+
+    function copySuccessUrl() {
+      const btn = document.getElementById('successCopyBtn');
+      navigator.clipboard.writeText(currentSuccessUrl).then(() => {
+        btn.classList.add('copied');
+        btn.querySelector('span').textContent = 'Copied!';
+        showToast('Copied to clipboard', 'success');
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.querySelector('span').textContent = 'Copy URL';
+        }, 2000);
+      }).catch(() => {
+        showToast('Failed to copy', 'error');
+      });
     }
 
     function showCreateModal() {

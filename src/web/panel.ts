@@ -558,8 +558,36 @@ export const PANEL_HTML = `<!DOCTYPE html>
       } catch (e) { clearInterval(iv); prog.classList.add('hidden'); errEl.textContent = e.message; errEl.classList.remove('hidden'); btn.disabled = false; document.getElementById('import-url').disabled = false; document.getElementById('import-name').disabled = false; }
     }
 
-    function copyUrl(id) { navigator.clipboard.writeText(document.getElementById(id).textContent); toast('Copied'); }
-    function copyToClipboard(text) { navigator.clipboard.writeText(text); toast('Copied to clipboard'); }
+    function copyUrl(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const text = el.textContent || el.innerText;
+
+      // Find the associated copy button
+      const btnId = id === 'create-url' ? 'create-copy-btn' : id === 'import-result-url' ? 'import-copy-btn' : null;
+      const btn = btnId ? document.getElementById(btnId) : null;
+
+      navigator.clipboard.writeText(text).then(() => {
+        if (btn) {
+          const span = btn.querySelector('span');
+          if (span) {
+            const originalText = span.textContent;
+            span.textContent = 'Copied!';
+            btn.classList.add('bg-emerald-500');
+            btn.classList.remove('bg-slate-900', 'hover:bg-slate-800');
+            setTimeout(() => {
+              span.textContent = originalText;
+              btn.classList.remove('bg-emerald-500');
+              btn.classList.add('bg-slate-900', 'hover:bg-slate-800');
+            }, 2000);
+          }
+        }
+        toast('Copied to clipboard');
+      }).catch(() => toast('Failed to copy', 'error'));
+    }
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard')).catch(() => toast('Failed to copy', 'error'));
+    }
 
     // ===== RENDER =====
     function render() {
@@ -676,12 +704,16 @@ export const PANEL_HTML = `<!DOCTYPE html>
 
     function createModalHTML() {
       return '<div id="create-modal" class="hidden fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4" onclick="if(event.target===this)closeCreate()">' +
-        '<div class="bg-white rounded-xl w-full max-w-sm fade-in shadow-xl"><div class="p-4 border-b border-slate-100"><h2 class="text-sm font-semibold text-slate-900">New Database</h2></div>' +
+        '<div class="bg-white rounded-xl w-full max-w-md fade-in shadow-xl"><div class="p-4 border-b border-slate-100"><h2 class="text-sm font-semibold text-slate-900">New Database</h2></div>' +
         '<form id="create-form" onsubmit="doCreate(event)"><div class="p-4"><label class="block text-xs text-slate-500 mb-1.5">Name</label>' +
         '<input type="text" id="create-name" class="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm placeholder:text-slate-400 focus:border-slate-400 focus:ring-0 outline-none" placeholder="my-database" pattern="[a-zA-Z0-9-]+" required></div>' +
         '<div class="flex gap-2 p-4 pt-0"><button type="button" onclick="closeCreate()" class="flex-1 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200">Cancel</button><button type="submit" class="flex-1 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800">Create</button></div></form>' +
-        '<div id="create-result" class="hidden p-4"><div class="bg-slate-50 rounded-lg p-3 mb-3"><div class="text-[10px] text-slate-400 uppercase mb-1">Connection URL</div><div id="create-url" class="font-mono text-xs text-slate-700 break-all"></div></div>' +
-        '<button onclick="copyUrl(\\'create-url\\')" class="w-full py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 flex items-center justify-center gap-1.5">' + icons.copy + 'Copy</button>' +
+        '<div id="create-result" class="hidden p-4">' +
+        '<div class="flex items-center justify-center mb-4"><div class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">' + icons.check + '</div></div>' +
+        '<h3 class="text-center text-sm font-semibold text-slate-900 mb-1">Database Created!</h3>' +
+        '<p class="text-center text-xs text-slate-500 mb-4">Your database is ready to use</p>' +
+        '<div class="bg-slate-50 rounded-lg p-3 mb-3"><div class="text-[10px] text-slate-400 uppercase mb-1">Connection URL</div><div id="create-url" class="font-mono text-xs text-slate-700 break-all select-all"></div></div>' +
+        '<button id="create-copy-btn" onclick="copyUrl(\\'create-url\\')" class="w-full py-2.5 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 flex items-center justify-center gap-1.5 transition-colors">' + icons.copy + '<span>Copy URL</span></button>' +
         '<button onclick="closeCreate()" class="w-full mt-2 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200">Done</button></div></div></div>';
     }
 
@@ -696,8 +728,12 @@ export const PANEL_HTML = `<!DOCTYPE html>
         '<div id="import-error" class="hidden p-2 rounded-lg bg-red-50 text-xs text-red-600"></div>' +
         '<div id="import-progress" class="hidden"><div class="flex justify-between text-xs mb-1"><span class="text-slate-400">Importing...</span><span class="progress-pct text-slate-600 font-medium">0%</span></div><div class="h-1 bg-slate-200 rounded-full overflow-hidden"><div class="progress-fill h-full bg-slate-900 transition-all" style="width:0"></div></div></div></div>' +
         '<div class="flex gap-2 p-4 pt-0"><button type="button" onclick="closeImport()" class="flex-1 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200">Cancel</button><button type="submit" class="flex-1 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800">Import</button></div></form>' +
-        '<div id="import-result" class="hidden p-4"><div class="bg-emerald-50 rounded-lg p-3 mb-3"><div class="flex items-center gap-1.5 text-emerald-600 text-xs font-medium mb-1">' + icons.check + 'Success</div><div id="import-result-url" class="font-mono text-xs text-emerald-700 break-all"></div></div>' +
-        '<button onclick="copyUrl(\\'import-result-url\\')" class="w-full py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 flex items-center justify-center gap-1.5">' + icons.copy + 'Copy</button>' +
+        '<div id="import-result" class="hidden p-4">' +
+        '<div class="flex items-center justify-center mb-4"><div class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">' + icons.check + '</div></div>' +
+        '<h3 class="text-center text-sm font-semibold text-slate-900 mb-1">Import Complete!</h3>' +
+        '<p class="text-center text-xs text-slate-500 mb-4">Your database has been imported successfully</p>' +
+        '<div class="bg-slate-50 rounded-lg p-3 mb-3"><div class="text-[10px] text-slate-400 uppercase mb-1">Connection URL</div><div id="import-result-url" class="font-mono text-xs text-slate-700 break-all select-all"></div></div>' +
+        '<button id="import-copy-btn" onclick="copyUrl(\\'import-result-url\\')" class="w-full py-2.5 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 flex items-center justify-center gap-1.5 transition-colors">' + icons.copy + '<span>Copy URL</span></button>' +
         '<button onclick="closeImport()" class="w-full mt-2 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200">Done</button></div></div></div>';
     }
 
