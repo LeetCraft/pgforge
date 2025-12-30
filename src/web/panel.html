@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PgForge - Database Panel</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/recharts@2.10.3/umd/Recharts.js" crossorigin></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #e5e5e5;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .logo h1 {
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .btn {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: #5558e3;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #2a2a2a;
+    }
+
+    .btn-secondary:hover {
+      background: #3a3a3a;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      background: #1a1a1a;
+      padding: 4px;
+      border-radius: 10px;
+      width: fit-content;
+    }
+
+    .tab {
+      padding: 10px 20px;
+      background: transparent;
+      border: none;
+      color: #6b7280;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .tab:hover {
+      color: #e5e5e5;
+    }
+
+    .tab.active {
+      background: #6366f1;
+      color: white;
+    }
+
+    .databases {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .db-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .db-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .db-name {
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .status.running {
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    .status.stopped {
+      background: #f59e0b;
+    }
+
+    .status.error {
+      background: #ef4444;
+    }
+
+    .db-meta {
+      color: #6b7280;
+      font-size: 14px;
+      display: flex;
+      gap: 16px;
+    }
+
+    .db-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .db-actions button {
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6b7280;
+    }
+
+    .empty-state h2 {
+      font-size: 20px;
+      margin-bottom: 8px;
+      color: #e5e5e5;
+    }
+
+    /* Charts Section */
+    .charts-section {
+      margin-bottom: 40px;
+    }
+
+    .charts-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .charts-header h2 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .period-selector {
+      display: flex;
+      gap: 4px;
+      background: #1a1a1a;
+      padding: 4px;
+      border-radius: 8px;
+    }
+
+    .period-btn {
+      padding: 6px 12px;
+      background: transparent;
+      border: none;
+      color: #6b7280;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .period-btn:hover {
+      color: #e5e5e5;
+    }
+
+    .period-btn.active {
+      background: #6366f1;
+      color: white;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .chart-card h3 {
+      font-size: 14px;
+      font-weight: 500;
+      color: #9ca3af;
+      margin-bottom: 16px;
+    }
+
+    .chart-container {
+      height: 200px;
+    }
+
+    .no-data {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    /* Database Filter */
+    .db-filter {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #e5e5e5;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .db-filter:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+
+    /* Custom Date Modal */
+    .date-inputs {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .date-inputs input {
+      flex: 1;
+      padding: 10px;
+      background: #0f0f0f;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      color: #e5e5e5;
+      font-size: 14px;
+    }
+
+    .date-inputs input:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 400px;
+      transform: scale(0.95);
+      transition: all 0.2s;
+    }
+
+    .modal-overlay.active .modal {
+      transform: scale(1);
+    }
+
+    .modal h2 {
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      color: #9ca3af;
+      margin-bottom: 6px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      background: #0f0f0f;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      color: #e5e5e5;
+      font-size: 14px;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #6366f1;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .modal-actions button {
+      flex: 1;
+    }
+
+    /* Connection URL */
+    .connection-url {
+      background: #0f0f0f;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 12px;
+      word-break: break-all;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .connection-url:hover {
+      border-color: #6366f1;
+    }
+
+    .connection-url.copied {
+      border-color: #10b981;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 200;
+    }
+
+    .toast.active {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      border-color: #10b981;
+    }
+
+    .toast.error {
+      border-color: #ef4444;
+    }
+
+    /* Loading */
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #3a3a3a;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Recharts tooltip */
+    .recharts-tooltip-wrapper {
+      outline: none;
+    }
+
+    .custom-tooltip {
+      background: #1a1a1a !important;
+      border: 1px solid #2a2a2a !important;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .custom-tooltip .label {
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+
+    .custom-tooltip .value {
+      color: #e5e5e5;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <div class="logo-icon">&#128024;</div>
+        <h1>PgForge</h1>
+      </div>
+      <button class="btn" onclick="showCreateModal()">+ New Database</button>
+    </header>
+
+    <!-- Charts Section -->
+    <div id="chartsRoot"></div>
+
+    <div id="databases" class="databases">
+      <div class="empty-state">
+        <div class="loading"></div>
+        <p style="margin-top: 12px;">Loading databases...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Modal -->
+  <div id="createModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Create Database</h2>
+      <form id="createForm" onsubmit="createDatabase(event)">
+        <div class="form-group">
+          <label for="dbName">Database Name</label>
+          <input type="text" id="dbName" placeholder="my-app" pattern="[a-z0-9-]+" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="hideCreateModal()">Cancel</button>
+          <button type="submit" class="btn" id="createBtn">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Auth Modal -->
+  <div id="authModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Authentication Required</h2>
+      <form id="authForm" onsubmit="authenticate(event)">
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Enter password" required>
+        </div>
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="savePassword">
+            <label for="savePassword" style="margin: 0; color: #e5e5e5;">Save to localStorage</label>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn">Login</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Custom Date Modal -->
+  <div id="customDateModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Custom Date Range</h2>
+      <form id="customDateForm" onsubmit="applyCustomDate(event)">
+        <div class="date-inputs">
+          <div class="form-group">
+            <label for="startDate">Start Date</label>
+            <input type="datetime-local" id="startDate" required>
+          </div>
+          <div class="form-group">
+            <label for="endDate">End Date</label>
+            <input type="datetime-local" id="endDate" required>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="hideCustomDateModal()">Cancel</button>
+          <button type="submit" class="btn">Apply</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const API_BASE = '/api';
+    let authToken = localStorage.getItem('pgforge_token') || '';
+    let databases = [];
+
+    // Check auth on load
+    async function init() {
+      if (!authToken) {
+        showAuthModal();
+        return;
+      }
+      await loadDatabases();
+      initCharts();
+    }
+
+    async function authenticate(e) {
+      e.preventDefault();
+      const password = document.getElementById('password').value;
+      const save = document.getElementById('savePassword').checked;
+
+      try {
+        const res = await fetch(`${API_BASE}/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+
+        if (!res.ok) {
+          showToast('Invalid password', 'error');
+          return;
+        }
+
+        const data = await res.json();
+        authToken = data.token;
+
+        if (save) {
+          localStorage.setItem('pgforge_token', authToken);
+        }
+
+        hideAuthModal();
+        await loadDatabases();
+        initCharts();
+      } catch (err) {
+        showToast('Connection failed', 'error');
+      }
+    }
+
+    async function loadDatabases() {
+      try {
+        const res = await fetch(`${API_BASE}/databases`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (res.status === 401) {
+          authToken = '';
+          localStorage.removeItem('pgforge_token');
+          showAuthModal();
+          return;
+        }
+
+        databases = await res.json();
+        renderDatabases(databases);
+      } catch (err) {
+        document.getElementById('databases').innerHTML = `
+          <div class="empty-state">
+            <h2>Connection Error</h2>
+            <p>Could not connect to PgForge server</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderDatabases(dbs) {
+      const container = document.getElementById('databases');
+
+      if (dbs.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <h2>No databases yet</h2>
+            <p>Click "New Database" to create your first database</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = dbs.map(db => `
+        <div class="db-card">
+          <div class="db-info">
+            <div class="db-name">
+              <span class="status ${db.status}"></span>
+              ${db.name}
+            </div>
+            <div class="db-meta">
+              <span>Port: ${db.port}</span>
+              <span>Size: ${db.size || 'N/A'}</span>
+              <span>Tables: ${db.tables || 0}</span>
+            </div>
+            <div class="connection-url" onclick="copyUrl(this, '${db.url}')" title="Click to copy">
+              ${db.url}
+            </div>
+          </div>
+          <div class="db-actions">
+            ${db.status === 'running'
+              ? `<button class="btn btn-secondary" onclick="stopDatabase('${db.name}')">Stop</button>`
+              : `<button class="btn" onclick="startDatabase('${db.name}')">Start</button>`
+            }
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function createDatabase(e) {
+      e.preventDefault();
+      const name = document.getElementById('dbName').value.trim().toLowerCase();
+      const btn = document.getElementById('createBtn');
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading"></span>';
+
+      try {
+        const res = await fetch(`${API_BASE}/databases`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ name })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(err.error || 'Failed to create database', 'error');
+          return;
+        }
+
+        hideCreateModal();
+        showToast('Database created successfully', 'success');
+        await loadDatabases();
+      } catch (err) {
+        showToast('Failed to create database', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create';
+      }
+    }
+
+    async function startDatabase(name) {
+      try {
+        await fetch(`${API_BASE}/databases/${name}/start`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        showToast(`Starting ${name}...`, 'success');
+        setTimeout(loadDatabases, 2000);
+      } catch (err) {
+        showToast('Failed to start database', 'error');
+      }
+    }
+
+    async function stopDatabase(name) {
+      try {
+        await fetch(`${API_BASE}/databases/${name}/stop`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        showToast(`Stopping ${name}...`, 'success');
+        setTimeout(loadDatabases, 2000);
+      } catch (err) {
+        showToast('Failed to stop database', 'error');
+      }
+    }
+
+    function copyUrl(el, url) {
+      navigator.clipboard.writeText(url);
+      el.classList.add('copied');
+      showToast('Copied to clipboard', 'success');
+      setTimeout(() => el.classList.remove('copied'), 2000);
+    }
+
+    function showCreateModal() {
+      document.getElementById('createModal').classList.add('active');
+      document.getElementById('dbName').focus();
+    }
+
+    function hideCreateModal() {
+      document.getElementById('createModal').classList.remove('active');
+      document.getElementById('createForm').reset();
+    }
+
+    function showAuthModal() {
+      document.getElementById('authModal').classList.add('active');
+      document.getElementById('password').focus();
+    }
+
+    function hideAuthModal() {
+      document.getElementById('authModal').classList.remove('active');
+    }
+
+    function showCustomDateModal() {
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      document.getElementById('startDate').value = yesterday.toISOString().slice(0, 16);
+      document.getElementById('endDate').value = now.toISOString().slice(0, 16);
+      document.getElementById('customDateModal').classList.add('active');
+    }
+
+    function hideCustomDateModal() {
+      document.getElementById('customDateModal').classList.remove('active');
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = `toast active ${type}`;
+      setTimeout(() => toast.classList.remove('active'), 3000);
+    }
+
+    // Close modals on escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        hideCreateModal();
+        hideCustomDateModal();
+      }
+    });
+
+    // Close modals on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay && overlay.id !== 'authModal') {
+          overlay.classList.remove('active');
+        }
+      });
+    });
+
+    // ===== React Charts Component =====
+    function initCharts() {
+      const { useState, useEffect } = React;
+      const {
+        LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+        AreaChart, Area
+      } = Recharts;
+
+      function MetricsCharts() {
+        const [period, setPeriod] = useState('24h');
+        const [selectedDb, setSelectedDb] = useState('');
+        const [metrics, setMetrics] = useState([]);
+        const [loading, setLoading] = useState(true);
+        const [customRange, setCustomRange] = useState(null);
+
+        useEffect(() => {
+          loadMetrics();
+        }, [period, selectedDb, customRange]);
+
+        async function loadMetrics() {
+          setLoading(true);
+          try {
+            let url = `${API_BASE}/metrics?`;
+            if (customRange) {
+              url += `start=${customRange.start}&end=${customRange.end}`;
+            } else {
+              url += `period=${period}`;
+            }
+            if (selectedDb) {
+              url += `&database=${selectedDb}`;
+            }
+
+            const res = await fetch(url, {
+              headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              setMetrics(data);
+            }
+          } catch (err) {
+            console.error('Failed to load metrics:', err);
+          } finally {
+            setLoading(false);
+          }
+        }
+
+        function handlePeriodChange(newPeriod) {
+          if (newPeriod === 'custom') {
+            showCustomDateModal();
+            return;
+          }
+          setCustomRange(null);
+          setPeriod(newPeriod);
+        }
+
+        // Make applyCustomDate accessible globally
+        window.applyCustomDate = function(e) {
+          e.preventDefault();
+          const startDate = new Date(document.getElementById('startDate').value);
+          const endDate = new Date(document.getElementById('endDate').value);
+          setCustomRange({
+            start: startDate.getTime(),
+            end: endDate.getTime()
+          });
+          setPeriod('custom');
+          hideCustomDateModal();
+        };
+
+        function formatTime(timestamp) {
+          const date = new Date(timestamp);
+          if (period === '30d' || (customRange && customRange.end - customRange.start > 7 * 24 * 60 * 60 * 1000)) {
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          } else if (period === '7d' || (customRange && customRange.end - customRange.start > 24 * 60 * 60 * 1000)) {
+            return date.toLocaleDateString('en-US', { weekday: 'short', hour: '2-digit' });
+          }
+          return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function CustomTooltip({ active, payload, label }) {
+          if (active && payload && payload.length) {
+            return React.createElement('div', { className: 'custom-tooltip' },
+              React.createElement('p', { className: 'label' }, formatTime(label)),
+              payload.map((entry, index) =>
+                React.createElement('p', { key: index, className: 'value', style: { color: entry.color } },
+                  `${entry.name}: ${entry.value?.toFixed(2) || 0}`
+                )
+              )
+            );
+          }
+          return null;
+        }
+
+        const chartColors = {
+          cpu: '#6366f1',
+          memory: '#10b981',
+          connections: '#f59e0b',
+          disk: '#ec4899'
+        };
+
+        return React.createElement('div', { className: 'charts-section' },
+          React.createElement('div', { className: 'charts-header' },
+            React.createElement('h2', null, 'Resource Usage'),
+            React.createElement('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } },
+              databases.length > 0 && React.createElement('select', {
+                className: 'db-filter',
+                value: selectedDb,
+                onChange: (e) => setSelectedDb(e.target.value)
+              },
+                React.createElement('option', { value: '' }, 'All Databases'),
+                databases.map(db =>
+                  React.createElement('option', { key: db.name, value: db.name }, db.name)
+                )
+              ),
+              React.createElement('div', { className: 'period-selector' },
+                ['24h', '7d', '30d', 'custom'].map(p =>
+                  React.createElement('button', {
+                    key: p,
+                    className: `period-btn ${(period === p || (p === 'custom' && customRange)) ? 'active' : ''}`,
+                    onClick: () => handlePeriodChange(p)
+                  }, p === 'custom' ? 'Custom' : p.toUpperCase())
+                )
+              )
+            )
+          ),
+          loading ?
+            React.createElement('div', { className: 'no-data' },
+              React.createElement('div', { className: 'loading' })
+            ) :
+            metrics.length === 0 ?
+              React.createElement('div', { className: 'no-data', style: { height: '300px' } },
+                'No metrics data yet. Start the daemon with "pgforge daemon start" to collect metrics.'
+              ) :
+              React.createElement('div', { className: 'charts-grid' },
+                // CPU Chart
+                React.createElement('div', { className: 'chart-card' },
+                  React.createElement('h3', null, 'CPU Usage (%)'),
+                  React.createElement('div', { className: 'chart-container' },
+                    React.createElement(ResponsiveContainer, { width: '100%', height: '100%' },
+                      React.createElement(AreaChart, { data: metrics },
+                        React.createElement('defs', null,
+                          React.createElement('linearGradient', { id: 'cpuGradient', x1: '0', y1: '0', x2: '0', y2: '1' },
+                            React.createElement('stop', { offset: '5%', stopColor: chartColors.cpu, stopOpacity: 0.3 }),
+                            React.createElement('stop', { offset: '95%', stopColor: chartColors.cpu, stopOpacity: 0 })
+                          )
+                        ),
+                        React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: '#2a2a2a' }),
+                        React.createElement(XAxis, {
+                          dataKey: 'timestamp',
+                          tickFormatter: formatTime,
+                          stroke: '#6b7280',
+                          tick: { fill: '#6b7280', fontSize: 11 }
+                        }),
+                        React.createElement(YAxis, {
+                          stroke: '#6b7280',
+                          tick: { fill: '#6b7280', fontSize: 11 }
+                        }),
+                        React.createElement(Tooltip, { content: CustomTooltip }),
+                        React.createElement(Area, {
+                          type: 'monotone',
+                          dataKey: 'cpu_percent',
+                          name: 'CPU',
+                          stroke: chartColors.cpu,
+                          fill: 'url(#cpuGradient)',
+                          strokeWidth: 2
+                        })
+                      )
+                    )
+                  )
+                ),
+                // Memory Chart
+                React.createElement('div', { className: 'chart-card' },
+                  React.createElement('h3', null, 'Memory Usage (MB)'),
+                  React.createElement('div', { className: 'chart-container' },
+                    React.createElement(ResponsiveContainer, { width: '100%', height: '100%' },
+                      React.createElement(AreaChart, { data: metrics },
+                        React.createElement('defs', null,
+                          React.createElement('linearGradient', { id: 'memGradient', x1: '0', y1: '0', x2: '0', y2: '1' },
+                            React.createElement('stop', { offset: '5%', stopColor: chartColors.memory, stopOpacity: 0.3 }),
+                            React.createElement('stop', { offset: '95%', stopColor: chartColors.memory, stopOpacity: 0 })
+                          )
+                        ),
+                        React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: '#2a2a2a' }),
+                        React.createElement(XAxis, {
+                          dataKey: 'timestamp',
+                          tickFormatter: formatTime,
+                          stroke: '#6b7280',
+                          tick: { fill: '#6b7280', fontSize: 11 }
+                        }),
+                        React.createElement(YAxis, {
+                          stroke: '#6b7280',
+                          tick: { fill: '#6b7280', fontSize: 11 }
+                        }),
+                        React.createElement(Tooltip, { content: CustomTooltip }),
+                        React.createElement(Area, {
+                          type: 'monotone',
+                          dataKey: 'memory_mb',
+                          name: 'Memory',
+                          stroke: chartColors.memory,
+                          fill: 'url(#memGradient)',
+                          strokeWidth: 2
+                        })
+                      )
+                    )
+                  )
+                ),
+                // Connections Chart
+                React.createElement('div', { className: 'chart-card' },
+                  React.createElement('h3', null, 'Active Connections'),
+                  React.createElement('div', { className: 'chart-container' },
+                    React.createElement(ResponsiveContainer, { width: '100%', height: '100%' },
+                      React.createElement(AreaChart, { data: metrics },
+                        React.createElement('defs', null,
+                          React.createElement('linearGradient', { id: 'connGradient', x1: '0', y1: '0', x2: '0', y2: '1' },
+                            React.createElement('stop', { offset: '5%', stopColor: chartColors.connections, stopOpacity: 0.3 }),
+                            React.createElement('stop', { offset: '95%', stopColor: chartColors.connections, stopOpacity: 0 })
+                          )
+                        ),
+                        React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: '#2a2a2a' }),
+                        React.createElement(XAxis, {
+                          dataKey: 'timestamp',
+                          tickFormatter: formatTime,
+                          stroke: '#6b7280',
+                          tick: { fill: '#6b7280', fontSize: 11 }
+                        }),
+                        React.createElement(YAxis, {
+                          stroke: '#6b7280',
+                          tick: { fill: '#6b7280', fontSize: 11 }
+                        }),
+                        React.createElement(Tooltip, { content: CustomTooltip }),
+                        React.createElement(Area, {
+                          type: 'monotone',
+                          dataKey: 'connections',
+                          name: 'Connections',
+                          stroke: chartColors.connections,
+                          fill: 'url(#connGradient)',
+                          strokeWidth: 2
+                        })
+                      )
+                    )
+                  )
+                ),
+                // Disk Chart
+                React.createElement('div', { className: 'chart-card' },
+                  React.createElement('h3', null, 'Disk Usage (MB)'),
+                  React.createElement('div', { className: 'chart-container' },
+                    React.createElement(ResponsiveContainer, { width: '100%', height: '100%' },
+                      React.createElement(AreaChart, { data: metrics },
+                        React.createElement('defs', null,
+                          React.createElement('linearGradient', { id: 'diskGradient', x1: '0', y1: '0', x2: '0', y2: '1' },
+                            React.createElement('stop', { offset: '5%', stopColor: chartColors.disk, stopOpacity: 0.3 }),
+                            React.createElement('stop', { offset: '95%', stopColor: chartColors.disk, stopOpacity: 0 })
+                          )
+                        ),
+                        React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: '#2a2a2a' }),
+                        React.createElement(XAxis, {
+                          dataKey: 'timestamp',
+                          tickFormatter: formatTime,
+                          stroke: '#6b7280',
+                          tick: { fill: '#6b7280', fontSize: 11 }
+                        }),
+                        React.createElement(YAxis, {
+                          stroke: '#6b7280',
+                          tick: { fill: '#6b7280', fontSize: 11 }
+                        }),
+                        React.createElement(Tooltip, { content: CustomTooltip }),
+                        React.createElement(Area, {
+                          type: 'monotone',
+                          dataKey: 'disk_mb',
+                          name: 'Disk',
+                          stroke: chartColors.disk,
+                          fill: 'url(#diskGradient)',
+                          strokeWidth: 2
+                        })
+                      )
+                    )
+                  )
+                )
+              )
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('chartsRoot'));
+      root.render(React.createElement(MetricsCharts));
+    }
+
+    init();
+  </script>
+</body>
+</html>

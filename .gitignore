@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+bun.lock
+
+# Build output
+dist/
+easy-db
+easy-db-*
+
+# Local config and state (contains credentials)
+config/
+state/
+databases/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+
+# Claude
+.claude/
