@@ -4,7 +4,7 @@ import * as ui from "../lib/ui";
 import { VERSION } from "../lib/constants";
 import { stopDaemon, ensureDaemonRunning, isDaemonRunning } from "../lib/daemon";
 
-const REPO = "CyberClarence/pgforge";
+const REPO = "LeetCraft/pgforge";
 const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
 const INSTALL_DIR = join(homedir(), ".pgforge", "bin");
 

@@ -106,7 +106,7 @@ jobs:
             ## Installation
 
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/CyberClarence/pgforge/main/install.sh | bash
+            curl -fsSL https://raw.githubusercontent.com/LeetCraft/pgforge/main/install.sh | bash
             ```
 
             ## Binaries

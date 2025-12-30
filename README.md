@@ -5,7 +5,7 @@ Serverless PostgreSQL databases made simple. Spin up production-ready PostgreSQL
 ## Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/CyberClarence/pgforge/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/LeetCraft/pgforge/main/install.sh | bash
 ```
 
 The installer will:
@@ -218,7 +218,7 @@ pgforge update
 Or reinstall:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/CyberClarence/pgforge/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/LeetCraft/pgforge/main/install.sh | bash
 ```
 
 ## Uninstall

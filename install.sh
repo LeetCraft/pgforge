@@ -2,9 +2,9 @@
 set -e
 
 # PgForge installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/CyberClarence/pgforge/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/LeetCraft/pgforge/main/install.sh | bash
 
-REPO="CyberClarence/pgforge"
+REPO="LeetCraft/pgforge"
 INSTALL_DIR="$HOME/.pgforge/bin"
 BINARY_NAME="pgforge"
 STATE_DIR="$HOME/.pgforge/state"
