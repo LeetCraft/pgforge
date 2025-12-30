@@ -558,6 +558,35 @@ export const PANEL_HTML = `<!DOCTYPE html>
       } catch (e) { clearInterval(iv); prog.classList.add('hidden'); errEl.textContent = e.message; errEl.classList.remove('hidden'); btn.disabled = false; document.getElementById('import-url').disabled = false; document.getElementById('import-name').disabled = false; }
     }
 
+    // Clipboard helper that works over HTTP (fallback for non-secure contexts)
+    function copyText(text) {
+      return new Promise((resolve, reject) => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(resolve).catch(() => fallbackCopy(text, resolve, reject));
+        } else {
+          fallbackCopy(text, resolve, reject);
+        }
+      });
+    }
+
+    function fallbackCopy(text, resolve, reject) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        resolve();
+      } catch (e) {
+        reject(e);
+      }
+      document.body.removeChild(textarea);
+    }
+
     function copyUrl(id) {
       const el = document.getElementById(id);
       if (!el) return;
@@ -567,7 +596,7 @@ export const PANEL_HTML = `<!DOCTYPE html>
       const btnId = id === 'create-url' ? 'create-copy-btn' : id === 'import-result-url' ? 'import-copy-btn' : null;
       const btn = btnId ? document.getElementById(btnId) : null;
 
-      navigator.clipboard.writeText(text).then(() => {
+      copyText(text).then(() => {
         if (btn) {
           const span = btn.querySelector('span');
           if (span) {
@@ -585,16 +614,17 @@ export const PANEL_HTML = `<!DOCTYPE html>
         toast('Copied to clipboard');
       }).catch(() => toast('Failed to copy', 'error'));
     }
+
     function copyToClipboard(text) {
-      navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard')).catch(() => toast('Failed to copy', 'error'));
+      copyText(text).then(() => toast('Copied to clipboard')).catch(() => toast('Failed to copy', 'error'));
     }
 
     function copyExplorerUrl() {
       const el = document.getElementById('explorer-url');
       const btn = document.getElementById('explorer-copy-btn');
       if (!el) return;
-      const text = el.textContent || el.innerText;
-      navigator.clipboard.writeText(text).then(() => {
+      const text = el.getAttribute('data-url') || el.textContent || el.innerText;
+      copyText(text).then(() => {
         if (btn) {
           const span = btn.querySelector('span');
           if (span) {
@@ -706,12 +736,14 @@ export const PANEL_HTML = `<!DOCTYPE html>
     function explorerHTML() {
       const db = state.dbs.find(d => d.name === state.dbName);
       const connUrl = db ? 'postgresql://' + db.user + ':' + db.password + '@' + db.host + ':' + db.port + '/' + db.database : '';
+      // Build URL with blurred password for display (but still selectable)
+      const urlWithBlurredPw = db ? '<span>postgresql://' + escapeHtml(db.user) + ':</span><span class="blur-sm hover:blur-none transition-all duration-200 select-all">' + escapeHtml(db.password) + '</span><span>@' + escapeHtml(db.host) + ':' + db.port + '/' + escapeHtml(db.database) + '</span>' : '';
       const s = state.dbStats[state.dbName];
 
       return '<div class="fade-in h-[calc(100vh-48px)] flex flex-col max-w-6xl">' +
         '<div class="mb-4 flex-shrink-0"><div class="flex items-center justify-between">' +
         '<div><h1 class="text-lg font-semibold text-slate-900">' + escapeHtml(state.dbName) + '</h1><p class="text-slate-400 text-sm">Browse tables and data</p></div>' +
-        (db && connUrl ? '<div class="flex items-center gap-2 max-w-lg"><div class="flex-1 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono overflow-x-auto whitespace-nowrap select-all" id="explorer-url">' + escapeHtml(connUrl) + '</div><button onclick="copyExplorerUrl()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors" id="explorer-copy-btn">' + icons.copy + '<span>Copy</span></button></div>' : '') +
+        (db && connUrl ? '<div class="flex items-center gap-2"><div class="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-nowrap select-all" id="explorer-url" data-url="' + escapeHtml(connUrl) + '">' + urlWithBlurredPw + '</div><button onclick="copyExplorerUrl()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors" id="explorer-copy-btn">' + icons.copy + '<span>Copy</span></button></div>' : '') +
         '</div>' +
         (db && db.status === 'running' ? '<div class="relative"><div id="live-indicator" class="absolute -top-1 right-0 flex items-center gap-1.5 text-[10px] text-emerald-600 opacity-0 transition-opacity duration-300"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Updated</div>' +
           '<div class="grid grid-cols-4 gap-3 mt-4">' +
