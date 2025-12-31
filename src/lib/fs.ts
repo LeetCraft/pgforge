@@ -90,9 +90,9 @@ export async function ensureDatabaseDir(dbName: string): Promise<string> {
   // The data directory will be chown'd by postgres container on first run anyway
   await Bun.$`chmod 777 ${dbPath}/data`.quiet().nothrow();
 
-  // Verify the directory was created and is accessible
-  const dataExists = await Bun.file(`${dbPath}/data`).exists().catch(() => false);
-  if (!dataExists) {
+  // Verify the directory was created and is accessible (use test -d for directories)
+  const checkResult = await Bun.$`test -d ${dbPath}/data`.quiet().nothrow();
+  if (checkResult.exitCode !== 0) {
     throw new Error(
       `Database directory was not created properly: ${dbPath}/data\n` +
       `This may be a permissions issue. Try:\n` +
