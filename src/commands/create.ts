@@ -1,7 +1,7 @@
 import { ensureDirectories, ensureDatabaseDir, getConfig, getState, saveState, getComposePath, getDatabasePath } from "../lib/fs";
-import { allocatePort } from "../lib/ports";
+import { allocatePort, releasePort } from "../lib/ports";
 import { generateComposeFile, generateInitScript } from "../lib/compose";
-import { startDatabase, getContainerStatus } from "../lib/docker";
+import { startDatabase, getContainerStatus, destroyDatabase } from "../lib/docker";
 import { getPublicIp, buildConnectionUrl } from "../lib/network";
 import { generatePassword, generateUsername, isValidName } from "../lib/crypto";
 import * as ui from "../lib/ui";
@@ -107,6 +107,8 @@ export async function create(options: CreateOptions): Promise<void> {
   } catch (err) {
     startSpin.fail("Failed to start database");
     ui.error(err instanceof Error ? err.message : String(err));
+    // Clean up failed containers and release port
+    await cleanupFailedDatabase(name);
     process.exit(1);
   }
 
@@ -124,6 +126,8 @@ export async function create(options: CreateOptions): Promise<void> {
     if (status === "error") {
       startSpin.fail("Database container failed to start");
       ui.error("Check 'docker logs pgforge-" + name + "-pg' for details.");
+      // Clean up failed containers and release port
+      await cleanupFailedDatabase(name);
       process.exit(1);
     }
     await Bun.sleep(1000);
@@ -132,6 +136,8 @@ export async function create(options: CreateOptions): Promise<void> {
 
   if (attempts >= maxAttempts) {
     startSpin.fail("Timeout waiting for database to start");
+    // Clean up failed containers and release port
+    await cleanupFailedDatabase(name);
     process.exit(1);
   }
 
@@ -183,4 +189,20 @@ export async function create(options: CreateOptions): Promise<void> {
 
   console.log();
   ui.muted("Copy the connection URL above to use in your application.");
+}
+
+/**
+ * Clean up a failed database creation
+ * Removes containers, networks, and releases port allocation
+ */
+async function cleanupFailedDatabase(name: string): Promise<void> {
+  try {
+    ui.muted("Cleaning up failed database...");
+    // Stop and remove any containers/networks that were created
+    await destroyDatabase(name);
+    // Release the port allocation so it can be reused
+    await releasePort(name);
+  } catch {
+    // Ignore cleanup errors - best effort
+  }
 }

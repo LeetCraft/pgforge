@@ -3,24 +3,32 @@ import { getPortRegistry, savePortRegistry } from "./fs";
 
 /**
  * Allocate a port for a database
- * - If the database already has a port allocated, return it
+ * - If the database already has a port allocated, return it (and verify it's free)
  * - Otherwise, find the next available port in the range
  * - Ports are never reused by different databases
+ * - Always verifies the port is actually free on the system before allocating
  */
 export async function allocatePort(dbName: string): Promise<number> {
   const registry = await getPortRegistry();
 
-  // If this database already has a port, return it
+  // If this database already has a port, verify it's free and return it
   if (registry.allocated[dbName] !== undefined) {
-    return registry.allocated[dbName];
+    const existingPort = registry.allocated[dbName];
+    // Verify the port is actually available on the system
+    if (await isPortAvailable(existingPort)) {
+      return existingPort;
+    }
+    // Port is in use by something else - we need to find a new one
+    // Remove the old allocation first
+    delete registry.allocated[dbName];
   }
 
-  // Find all used ports
+  // Find all used ports in registry
   const usedPorts = new Set(Object.values(registry.allocated));
 
-  // Find next available port
+  // Find next available port that is BOTH not in registry AND actually free on system
   for (let port = PORT_RANGE.start; port <= PORT_RANGE.end; port++) {
-    if (!usedPorts.has(port)) {
+    if (!usedPorts.has(port) && await isPortAvailable(port)) {
       registry.allocated[dbName] = port;
       await savePortRegistry(registry);
       return port;
@@ -42,16 +50,15 @@ export async function getPort(dbName: string): Promise<number | null> {
 }
 
 /**
- * Release a port when a database is deleted
- * The port remains reserved for this database name forever
- * This ensures if the user recreates a DB with the same name, it gets the same port
+ * Release a port when a database is deleted or creation fails
+ * Removes the port allocation so it can be reused
  */
 export async function releasePort(dbName: string): Promise<void> {
   const registry = await getPortRegistry();
-  // We intentionally keep the port allocated to this name
-  // This prevents port reuse issues in serverless environments
-  // where connection strings might be cached
-  await savePortRegistry(registry);
+  if (registry.allocated[dbName] !== undefined) {
+    delete registry.allocated[dbName];
+    await savePortRegistry(registry);
+  }
 }
 
 /**
