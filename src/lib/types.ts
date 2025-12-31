@@ -3,6 +3,7 @@ export interface Config {
   publicIp: string | null;
   createdAt: string;
   version: string;
+  pgforgeHome?: string; // Custom storage location (auto-detected during setup)
 }
 
 export interface DatabaseState {

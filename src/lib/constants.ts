@@ -5,7 +5,7 @@ import { join } from "path";
 // VERSION
 // =============================================================================
 
-export const VERSION = "2.0.10";
+export const VERSION = "2.0.11";
 export const STATE_VERSION = 1; // Increment when state schema changes
 
 // =============================================================================
@@ -14,39 +14,62 @@ export const STATE_VERSION = 1; // Increment when state schema changes
 
 // Base directory for all PgForge data
 // Can be overridden with PGFORGE_HOME environment variable
-export const PGFORGE_HOME = process.env.PGFORGE_HOME || join(homedir(), ".pgforge");
+// In sandboxed environments, this may be auto-detected to /tmp/pgforge during setup
+let _pgforgeHome = process.env.PGFORGE_HOME || join(homedir(), ".pgforge");
 
-// Subdirectories
-export const PATHS = {
-  root: PGFORGE_HOME,
-  bin: join(PGFORGE_HOME, "bin"),
-  config: join(PGFORGE_HOME, "config"),
-  state: join(PGFORGE_HOME, "state"),
-  databases: join(PGFORGE_HOME, "databases"),
-  backups: join(PGFORGE_HOME, "backups"),
-} as const;
+// Allow runtime update of PGFORGE_HOME (called by setup when auto-detecting path)
+export function setPgforgeHome(path: string): void {
+  _pgforgeHome = path;
+  // Also set env var so child processes inherit it
+  process.env.PGFORGE_HOME = path;
+}
 
-// =============================================================================
-// FILES
-// =============================================================================
+// Getter for current PGFORGE_HOME
+export function getPgforgeHome(): string {
+  return _pgforgeHome;
+}
 
-export const FILES = {
-  // Config files
-  config: join(PATHS.config, "config.json"),
-  settings: join(PATHS.config, "settings.json"),
-  webConfig: join(PATHS.config, "web.json"),
+// For backwards compatibility, export as const (but use getter for dynamic paths)
+export const PGFORGE_HOME = _pgforgeHome;
 
-  // State files
-  state: join(PATHS.state, "state.json"),
-  portRegistry: join(PATHS.state, "ports.json"),
-  metricsDb: join(PATHS.state, "metrics.db"),
+// Dynamic path getters (use these instead of PATHS for runtime flexibility)
+export function getPaths() {
+  const home = _pgforgeHome;
+  return {
+    root: home,
+    bin: join(home, "bin"),
+    config: join(home, "config"),
+    state: join(home, "state"),
+    databases: join(home, "databases"),
+    backups: join(home, "backups"),
+  };
+}
 
-  // Daemon files
-  daemonPid: join(PATHS.state, "daemon.pid"),
-  daemonLock: join(PATHS.state, "daemon.lock"),
-  daemonLog: join(PATHS.state, "daemon.log"),
-  daemonHealth: join(PATHS.state, "daemon.health"),
-} as const;
+export function getFiles() {
+  const paths = getPaths();
+  return {
+    // Config files
+    config: join(paths.config, "config.json"),
+    settings: join(paths.config, "settings.json"),
+    webConfig: join(paths.config, "web.json"),
+
+    // State files
+    state: join(paths.state, "state.json"),
+    portRegistry: join(paths.state, "ports.json"),
+    metricsDb: join(paths.state, "metrics.db"),
+
+    // Daemon files
+    daemonPid: join(paths.state, "daemon.pid"),
+    daemonLock: join(paths.state, "daemon.lock"),
+    daemonLog: join(paths.state, "daemon.log"),
+    daemonHealth: join(paths.state, "daemon.health"),
+  };
+}
+
+// Static versions for backwards compatibility (computed at load time)
+// NOTE: For dynamic paths after setup, use getPaths() and getFiles()
+export const PATHS = getPaths();
+export const FILES = getFiles();
 
 // =============================================================================
 // INTERVALS & TIMEOUTS (in milliseconds)

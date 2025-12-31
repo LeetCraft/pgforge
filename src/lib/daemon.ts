@@ -1,6 +1,6 @@
 import { homedir, platform } from "os";
 import { join } from "path";
-import { PATHS, FILES, INTERVALS, LIMITS, VERSION } from "./constants";
+import { PATHS, getFiles, INTERVALS, LIMITS, VERSION } from "./constants";
 import { getAllDatabases } from "./fs";
 import { startDatabase, getContainerStatus } from "./docker";
 import { collectAllMetrics } from "./collector";
@@ -8,14 +8,15 @@ import { closeMetricsDb } from "./metrics";
 import { isBackupDue, runScheduledBackup } from "./s3";
 
 // ============================================================================
-// CONSTANTS (using centralized constants)
+// CONSTANTS (using dynamic getters for paths)
 // ============================================================================
 
-const DAEMON_PID_FILE = FILES.daemonPid;
-const DAEMON_LOCK_FILE = FILES.daemonLock;
-const DAEMON_LOG_FILE = FILES.daemonLog;
-const DAEMON_HEALTH_FILE = FILES.daemonHealth;
-const SETTINGS_FILE = FILES.settings;
+// These getters ensure paths are resolved at runtime after setup may have changed PGFORGE_HOME
+const getDaemonPidFile = () => getFiles().daemonPid;
+const getDaemonLockFile = () => getFiles().daemonLock;
+const getDaemonLogFile = () => getFiles().daemonLog;
+const getDaemonHealthFile = () => getFiles().daemonHealth;
+const getSettingsFile = () => getFiles().settings;
 
 // Intervals (from centralized constants)
 const COLLECTION_INTERVAL = INTERVALS.metricsCollection;
@@ -39,7 +40,7 @@ interface Settings {
 
 async function getSettings(): Promise<Settings> {
   try {
-    const file = Bun.file(SETTINGS_FILE);
+    const file = Bun.file(getSettingsFile());
     if (await file.exists()) {
       return await file.json();
     }
@@ -48,7 +49,7 @@ async function getSettings(): Promise<Settings> {
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
-  await atomicWrite(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+  await atomicWrite(getSettingsFile(), JSON.stringify(settings, null, 2));
 }
 
 export async function setLogsEnabled(enabled: boolean): Promise<void> {
@@ -116,7 +117,7 @@ async function acquireLock(): Promise<boolean> {
 
   try {
     // Check if lock exists and is stale
-    const existingLock = await safeRead(DAEMON_LOCK_FILE);
+    const existingLock = await safeRead(getDaemonLockFile());
     if (existingLock) {
       try {
         const existing = JSON.parse(existingLock) as LockInfo;
@@ -126,19 +127,19 @@ async function acquireLock(): Promise<boolean> {
           return false; // Another daemon is running
         }
         // Stale lock, remove it
-        await Bun.$`rm -f ${DAEMON_LOCK_FILE}`.quiet().nothrow();
+        await Bun.$`rm -f ${getDaemonLockFile()}`.quiet().nothrow();
       } catch {
         // Invalid lock file, remove it
-        await Bun.$`rm -f ${DAEMON_LOCK_FILE}`.quiet().nothrow();
+        await Bun.$`rm -f ${getDaemonLockFile()}`.quiet().nothrow();
       }
     }
 
     // Create lock file atomically
-    await atomicWrite(DAEMON_LOCK_FILE, JSON.stringify(lockInfo, null, 2));
+    await atomicWrite(getDaemonLockFile(), JSON.stringify(lockInfo, null, 2));
 
     // Verify we got the lock (handle race condition)
     await Bun.sleep(100);
-    const verifyLock = await safeRead(DAEMON_LOCK_FILE);
+    const verifyLock = await safeRead(getDaemonLockFile());
     if (verifyLock) {
       const verify = JSON.parse(verifyLock) as LockInfo;
       return verify.pid === process.pid;
@@ -155,11 +156,11 @@ async function acquireLock(): Promise<boolean> {
  */
 async function releaseLock(): Promise<void> {
   try {
-    const lockContent = await safeRead(DAEMON_LOCK_FILE);
+    const lockContent = await safeRead(getDaemonLockFile());
     if (lockContent) {
       const lock = JSON.parse(lockContent) as LockInfo;
       if (lock.pid === process.pid) {
-        await Bun.$`rm -f ${DAEMON_LOCK_FILE}`.quiet().nothrow();
+        await Bun.$`rm -f ${getDaemonLockFile()}`.quiet().nothrow();
       }
     }
   } catch {}
@@ -185,7 +186,7 @@ async function isProcessRunning(pid: number): Promise<boolean> {
  * Check if daemon is running
  */
 export async function isDaemonRunning(): Promise<boolean> {
-  const pidContent = await safeRead(DAEMON_PID_FILE);
+  const pidContent = await safeRead(getDaemonPidFile());
   if (!pidContent) return false;
 
   const pid = parseInt(pidContent.trim(), 10);
@@ -198,7 +199,7 @@ export async function isDaemonRunning(): Promise<boolean> {
  * Get daemon PID
  */
 export async function getDaemonPid(): Promise<number | null> {
-  const pidContent = await safeRead(DAEMON_PID_FILE);
+  const pidContent = await safeRead(getDaemonPidFile());
   if (!pidContent) return null;
 
   const pid = parseInt(pidContent.trim(), 10);
@@ -221,7 +222,7 @@ export async function getDaemonHealth(): Promise<{
   }
 
   try {
-    const healthContent = await safeRead(DAEMON_HEALTH_FILE);
+    const healthContent = await safeRead(getDaemonHealthFile());
     if (healthContent) {
       const health = JSON.parse(healthContent);
       const lastHeartbeat = health.timestamp;
@@ -278,7 +279,7 @@ async function startDaemonProcess(attempt = 1): Promise<{ success: boolean; mess
     const dockerPaths = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
     const helperScript = `#!/bin/sh
 export PATH="${dockerPaths}:$PATH"
-exec nohup "${pgforgeBinPath}" daemon run >> "${DAEMON_LOG_FILE}" 2>&1 &
+exec nohup "${pgforgeBinPath}" daemon run >> "${getDaemonLogFile()}" 2>&1 &
 `;
     const helperPath = `${homedir()}/.pgforge/state/daemon-start.sh`;
     await Bun.write(helperPath, helperScript);
@@ -320,7 +321,7 @@ export async function stopDaemon(): Promise<{ success: boolean; message: string 
 
   if (!pid) {
     // Clean up stale files
-    await Bun.$`rm -f ${DAEMON_PID_FILE} ${DAEMON_LOCK_FILE} ${DAEMON_HEALTH_FILE}`.quiet().nothrow();
+    await Bun.$`rm -f ${getDaemonPidFile()} ${getDaemonLockFile()} ${getDaemonHealthFile()}`.quiet().nothrow();
     return { success: true, message: "Daemon is not running" };
   }
 
@@ -332,7 +333,7 @@ export async function stopDaemon(): Promise<{ success: boolean; message: string 
     for (let i = 0; i < 20; i++) {
       await Bun.sleep(500);
       if (!(await isProcessRunning(pid))) {
-        await Bun.$`rm -f ${DAEMON_PID_FILE} ${DAEMON_LOCK_FILE} ${DAEMON_HEALTH_FILE}`.quiet().nothrow();
+        await Bun.$`rm -f ${getDaemonPidFile()} ${getDaemonLockFile()} ${getDaemonHealthFile()}`.quiet().nothrow();
         return { success: true, message: "Daemon stopped gracefully" };
       }
     }
@@ -341,10 +342,10 @@ export async function stopDaemon(): Promise<{ success: boolean; message: string 
     await Bun.$`kill -KILL ${pid}`.quiet().nothrow();
     await Bun.sleep(500);
 
-    await Bun.$`rm -f ${DAEMON_PID_FILE} ${DAEMON_LOCK_FILE} ${DAEMON_HEALTH_FILE}`.quiet().nothrow();
+    await Bun.$`rm -f ${getDaemonPidFile()} ${getDaemonLockFile()} ${getDaemonHealthFile()}`.quiet().nothrow();
     return { success: true, message: "Daemon force stopped" };
   } catch (err) {
-    await Bun.$`rm -f ${DAEMON_PID_FILE} ${DAEMON_LOCK_FILE} ${DAEMON_HEALTH_FILE}`.quiet().nothrow();
+    await Bun.$`rm -f ${getDaemonPidFile()} ${getDaemonLockFile()} ${getDaemonHealthFile()}`.quiet().nothrow();
     return { success: false, message: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -408,7 +409,7 @@ export async function restartAllDatabases(): Promise<{ started: string[]; failed
  */
 async function rotateLogsIfNeeded(): Promise<void> {
   try {
-    const logFile = Bun.file(DAEMON_LOG_FILE);
+    const logFile = Bun.file(getDaemonLogFile());
     if (!(await logFile.exists())) return;
 
     const stats = await logFile.size;
@@ -416,12 +417,12 @@ async function rotateLogsIfNeeded(): Promise<void> {
 
     // Rotate logs
     for (let i = MAX_LOG_FILES - 1; i >= 1; i--) {
-      const oldPath = `${DAEMON_LOG_FILE}.${i}`;
-      const newPath = `${DAEMON_LOG_FILE}.${i + 1}`;
+      const oldPath = `${getDaemonLogFile()}.${i}`;
+      const newPath = `${getDaemonLogFile()}.${i + 1}`;
       await Bun.$`mv ${oldPath} ${newPath}`.quiet().nothrow();
     }
 
-    await Bun.$`mv ${DAEMON_LOG_FILE} ${DAEMON_LOG_FILE}.1`.quiet().nothrow();
+    await Bun.$`mv ${getDaemonLogFile()} ${getDaemonLogFile()}.1`.quiet().nothrow();
   } catch {}
 }
 
@@ -475,7 +476,7 @@ async function writeHealthbeat(startedAt: number, metricsCollected: number): Pro
   };
 
   try {
-    await atomicWrite(DAEMON_HEALTH_FILE, JSON.stringify(health, null, 2));
+    await atomicWrite(getDaemonHealthFile(), JSON.stringify(health, null, 2));
   } catch {}
 }
 
@@ -553,8 +554,8 @@ RestartSec=10
 WatchdogSec=180
 TimeoutStopSec=30
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:${homedir()}/.pgforge/bin
-StandardOutput=append:${DAEMON_LOG_FILE}
-StandardError=append:${DAEMON_LOG_FILE}
+StandardOutput=append:${getDaemonLogFile()}
+StandardError=append:${getDaemonLogFile()}
 
 # Resource limits
 MemoryMax=512M
@@ -624,7 +625,7 @@ export async function runDaemonLoop(): Promise<never> {
   }
 
   // Write PID file
-  await atomicWrite(DAEMON_PID_FILE, String(process.pid));
+  await atomicWrite(getDaemonPidFile(), String(process.pid));
 
   // Initial health heartbeat
   await writeHealthbeat(startedAt, 0);
@@ -638,7 +639,7 @@ export async function runDaemonLoop(): Promise<never> {
     // Close metrics database connection
     closeMetricsDb();
     await releaseLock();
-    await Bun.$`rm -f ${DAEMON_PID_FILE} ${DAEMON_HEALTH_FILE}`.quiet().nothrow();
+    await Bun.$`rm -f ${getDaemonPidFile()} ${getDaemonHealthFile()}`.quiet().nothrow();
   };
 
   // Setup signal handlers

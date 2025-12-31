@@ -1,5 +1,39 @@
-import { PATHS, FILES, STATE_VERSION, VERSION } from "./constants";
+import { PATHS, FILES, STATE_VERSION, VERSION, getPaths, getFiles, setPgforgeHome, getPgforgeHome } from "./constants";
 import type { Config, State, PortRegistry, Migration } from "./types";
+import { homedir } from "os";
+import { join } from "path";
+
+// =============================================================================
+// CONFIG FILE DISCOVERY
+// =============================================================================
+
+/**
+ * Find the config file in possible locations
+ * Returns the path to an existing config, or the default path if none exists
+ */
+async function findConfigPath(): Promise<string> {
+  // Possible config locations in order of priority
+  const locations = [
+    // 1. Current PGFORGE_HOME (from env or default)
+    getFiles().config,
+    // 2. Home directory (default location)
+    join(homedir(), ".pgforge", "config", "config.json"),
+    // 3. /tmp/pgforge (fallback for sandboxed environments)
+    "/tmp/pgforge/config/config.json",
+    // 4. Current working directory
+    join(process.cwd(), ".pgforge", "config", "config.json"),
+  ];
+
+  for (const path of locations) {
+    const file = Bun.file(path);
+    if (await file.exists()) {
+      return path;
+    }
+  }
+
+  // Return default location if no config exists
+  return getFiles().config;
+}
 
 // =============================================================================
 // STATE MIGRATIONS
@@ -55,7 +89,8 @@ function migrateState(data: unknown, currentVersion: number): State {
  * Creates all necessary directories for pgforge operation
  */
 export async function ensureDirectories(): Promise<void> {
-  for (const path of Object.values(PATHS)) {
+  const paths = getPaths();
+  for (const path of Object.values(paths)) {
     const exists = await Bun.file(path).exists().catch(() => false);
     if (!exists) {
       await Bun.$`mkdir -p ${path}`.quiet();
@@ -64,7 +99,7 @@ export async function ensureDirectories(): Promise<void> {
 
   // Ensure the databases directory has permissions that allow Docker to create mount points
   // This is critical for environments where Docker runs as a different user
-  await Bun.$`chmod 755 ${PATHS.databases}`.quiet().nothrow();
+  await Bun.$`chmod 755 ${paths.databases}`.quiet().nothrow();
 }
 
 /**
@@ -72,7 +107,7 @@ export async function ensureDirectories(): Promise<void> {
  * Creates data, backups, and init directories with permissions that allow Docker to use them
  */
 export async function ensureDatabaseDir(dbName: string): Promise<string> {
-  const dbPath = `${PATHS.databases}/${dbName}`;
+  const dbPath = `${getPaths().databases}/${dbName}`;
 
   // Create all required subdirectories
   const mkdirResult = await Bun.$`mkdir -p ${dbPath}/data ${dbPath}/backups ${dbPath}/init`.quiet().nothrow();
@@ -80,7 +115,7 @@ export async function ensureDatabaseDir(dbName: string): Promise<string> {
     throw new Error(
       `Failed to create database directory: ${dbPath}\n` +
       `Error: ${mkdirResult.stderr.toString()}\n` +
-      `Tip: Check that you have write permissions to ${PATHS.databases}\n` +
+      `Tip: Check that you have write permissions to ${getPaths().databases}\n` +
       `You can set a custom location with: export PGFORGE_HOME=/path/to/writable/dir`
     );
   }
@@ -137,16 +172,33 @@ async function writeJson<T>(path: string, data: T): Promise<void> {
 // =============================================================================
 
 export async function getConfig(): Promise<Config> {
-  return readJson<Config>(FILES.config, {
+  // First, try to find an existing config file
+  const configPath = await findConfigPath();
+
+  const defaultConfig: Config = {
     initialized: false,
     publicIp: null,
     createdAt: new Date().toISOString(),
     version: VERSION,
-  });
+  };
+
+  const config = await readJson<Config>(configPath, defaultConfig);
+
+  // If config has a saved pgforgeHome, restore it
+  if (config.pgforgeHome && config.pgforgeHome !== getPgforgeHome()) {
+    setPgforgeHome(config.pgforgeHome);
+  }
+
+  return config;
 }
 
 export async function saveConfig(config: Config): Promise<void> {
-  await writeJson(FILES.config, config);
+  // Always save to the current pgforge home location
+  const configPath = getFiles().config;
+  // Ensure the config directory exists
+  const configDir = configPath.substring(0, configPath.lastIndexOf("/"));
+  await Bun.$`mkdir -p ${configDir}`.quiet().nothrow();
+  await writeJson(configPath, config);
 }
 
 // =============================================================================
@@ -160,7 +212,7 @@ export async function getState(): Promise<State> {
     lastUpdated: new Date().toISOString(),
   };
 
-  const raw = await readJson<unknown>(FILES.state, defaultState);
+  const raw = await readJson<unknown>(getFiles().state, defaultState);
 
   // Check if migration is needed
   const rawVersion = (raw as { version?: number }).version || 0;
@@ -176,7 +228,7 @@ export async function getState(): Promise<State> {
 export async function saveState(state: State): Promise<void> {
   state.version = STATE_VERSION;
   state.lastUpdated = new Date().toISOString();
-  await writeJson(FILES.state, state);
+  await writeJson(getFiles().state, state);
 }
 
 // =============================================================================
@@ -191,7 +243,7 @@ export async function getPortRegistry(): Promise<PortRegistry> {
     lastUpdated: new Date().toISOString(),
   };
 
-  const raw = await readJson<unknown>(FILES.portRegistry, defaultRegistry);
+  const raw = await readJson<unknown>(getFiles().portRegistry, defaultRegistry);
 
   // Handle legacy format without version
   const rawVersion = (raw as { version?: number }).version || 0;
@@ -211,14 +263,14 @@ export async function getPortRegistry(): Promise<PortRegistry> {
 export async function savePortRegistry(registry: PortRegistry): Promise<void> {
   registry.version = STATE_VERSION;
   registry.lastUpdated = new Date().toISOString();
-  await writeJson(FILES.portRegistry, registry);
+  await writeJson(getFiles().portRegistry, registry);
 }
 
 /**
  * Get database directory path
  */
 export function getDatabasePath(dbName: string): string {
-  return `${PATHS.databases}/${dbName}`;
+  return `${getPaths().databases}/${dbName}`;
 }
 
 /**

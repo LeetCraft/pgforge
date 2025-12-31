@@ -18,7 +18,7 @@ import {
   DeleteObjectCommand,
   HeadBucketCommand,
 } from "@aws-sdk/client-s3";
-import { PATHS } from "./constants";
+import { getPaths } from "./constants";
 import { join } from "path";
 
 // =============================================================================
@@ -47,7 +47,8 @@ export interface S3BackupInfo {
 // FILES
 // =============================================================================
 
-const S3_CONFIG_FILE = join(PATHS.config, "s3.json");
+// Dynamic getter for S3 config file - resolved at runtime after setup
+const getS3ConfigFile = () => join(getPaths().config, "s3.json");
 
 // =============================================================================
 // URL PARSING
@@ -139,7 +140,7 @@ export function formatS3Url(config: S3Config, maskSecret = true): string {
  */
 export async function getS3Config(): Promise<S3Config | null> {
   try {
-    const file = Bun.file(S3_CONFIG_FILE);
+    const file = Bun.file(getS3ConfigFile());
     if (await file.exists()) {
       return await file.json();
     }
@@ -151,14 +152,14 @@ export async function getS3Config(): Promise<S3Config | null> {
  * Save S3 config
  */
 export async function saveS3Config(config: S3Config): Promise<void> {
-  await Bun.write(S3_CONFIG_FILE, JSON.stringify(config, null, 2));
+  await Bun.write(getS3ConfigFile(), JSON.stringify(config, null, 2));
 }
 
 /**
  * Delete S3 config
  */
 export async function deleteS3Config(): Promise<void> {
-  await Bun.$`rm -f ${S3_CONFIG_FILE}`.quiet().nothrow();
+  await Bun.$`rm -f ${getS3ConfigFile()}`.quiet().nothrow();
 }
 
 // =============================================================================

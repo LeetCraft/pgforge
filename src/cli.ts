@@ -41,7 +41,7 @@ import {
   getDaemonPid,
 } from "./lib/daemon";
 import { getConfig } from "./lib/fs";
-import { VERSION } from "./lib/constants";
+import { VERSION, setPgforgeHome } from "./lib/constants";
 import * as ui from "./lib/ui";
 
 const program = new Command();
@@ -59,6 +59,10 @@ program
         ui.warning("PgForge has not been set up yet.");
         ui.info("Run 'pgforge setup' first to initialize.");
         process.exit(1);
+      }
+      // Restore the saved storage path from config
+      if (config.pgforgeHome) {
+        setPgforgeHome(config.pgforgeHome);
       }
     }
   });

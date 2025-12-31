@@ -1,7 +1,7 @@
-import { getAllDatabases, getState } from "./fs";
+import { getAllDatabases, getState, getDatabasePath } from "./fs";
 import { getContainerStatus, getDockerPath } from "./docker";
 import { recordMetrics, initMetricsDb, updateLastCollectionTime, cleanupOldMetrics } from "./metrics";
-import { LIMITS, PATHS } from "./constants";
+import { LIMITS } from "./constants";
 import type { MetricPoint } from "./metrics";
 
 // Track collection count for deterministic cleanup
@@ -133,7 +133,8 @@ async function getDockerStats(dbName: string): Promise<PostgresStats> {
     }
 
     // Get disk usage from filesystem
-    const diskResult = await Bun.$`du -sm ${PATHS.databases}/${dbName}/data 2>/dev/null | cut -f1`
+    const dbPath = getDatabasePath(dbName);
+    const diskResult = await Bun.$`du -sm ${dbPath}/data 2>/dev/null | cut -f1`
       .quiet()
       .nothrow();
     const disk_mb = diskResult.exitCode === 0 ? parseInt(diskResult.text().trim(), 10) || 0 : 0;

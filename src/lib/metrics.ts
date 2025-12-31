@@ -1,7 +1,8 @@
 import { Database, Statement } from "bun:sqlite";
-import { FILES } from "./constants";
+import { getFiles } from "./constants";
 
-const METRICS_DB_PATH = FILES.metricsDb;
+// Dynamic getter for metrics DB path - resolved at runtime after setup
+const getMetricsDbPath = () => getFiles().metricsDb;
 
 export interface MetricPoint {
   timestamp: number;
@@ -34,7 +35,7 @@ let cleanupMetricsStmt: Statement | null = null;
 export function initMetricsDb(): Database {
   if (db) return db;
 
-  db = new Database(METRICS_DB_PATH, { create: true });
+  db = new Database(getMetricsDbPath(), { create: true });
 
   // Create tables
   db.run(`

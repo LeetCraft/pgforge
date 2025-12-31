@@ -1,6 +1,5 @@
-import { getState, saveState, getAllDatabases } from "../lib/fs";
+import { getState, saveState, getAllDatabases, getDatabasePath } from "../lib/fs";
 import { getContainerStatus, stopDatabase, startDatabase, getDockerPath } from "../lib/docker";
-import { FILES } from "../lib/constants";
 import * as ui from "../lib/ui";
 import * as readline from "readline";
 
@@ -110,8 +109,8 @@ export async function rename(options: RenameOptions): Promise<void> {
 
     // Rename directory
     spin.text = "Renaming database directory...";
-    const oldDir = `${FILES.databases}/${fromName}`;
-    const newDir = `${FILES.databases}/${toName}`;
+    const oldDir = getDatabasePath(fromName);
+    const newDir = getDatabasePath(toName);
     await Bun.$`mv ${oldDir} ${newDir}`.quiet();
 
     // Update docker-compose.yml with new container names

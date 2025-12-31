@@ -2,8 +2,43 @@ import { checkDocker, testDockerMount } from "../lib/docker";
 import { ensureDirectories, getConfig, saveConfig } from "../lib/fs";
 import { getPublicIp } from "../lib/network";
 import { ensureDaemonRunning, installAutostart } from "../lib/daemon";
-import { PATHS } from "../lib/constants";
+import { getPaths, getPgforgeHome, setPgforgeHome } from "../lib/constants";
+import { homedir } from "os";
+import { join } from "path";
 import * as ui from "../lib/ui";
+
+/**
+ * Find a Docker-accessible path for pgforge data
+ * Tries multiple locations in order of preference
+ */
+async function findDockerAccessiblePath(): Promise<string | null> {
+  const candidatePaths = [
+    // 1. User's home directory (preferred - persists across reboots)
+    join(homedir(), ".pgforge"),
+    // 2. /tmp/pgforge (works in most sandboxed environments)
+    "/tmp/pgforge",
+    // 3. Current working directory (workspace-relative)
+    join(process.cwd(), ".pgforge"),
+  ];
+
+  for (const path of candidatePaths) {
+    // Create the test directory
+    await Bun.$`mkdir -p ${path}/databases`.quiet().nothrow();
+
+    // Test if Docker can mount it
+    const result = await testDockerMount(`${path}/databases`);
+    if (result.success) {
+      return path;
+    }
+
+    // Clean up failed test directory if it's not the current home
+    if (path !== getPgforgeHome()) {
+      await Bun.$`rm -rf ${path}`.quiet().nothrow();
+    }
+  }
+
+  return null;
+}
 
 export async function setup(): Promise<void> {
   ui.printBanner();
@@ -72,37 +107,32 @@ export async function setup(): Promise<void> {
 
   spin.succeed("Docker and Docker Compose are ready");
 
-  // Create directories
+  // Find a Docker-accessible path (auto-detect)
+  const pathSpin = ui.spinner("Finding Docker-accessible storage location...");
+  pathSpin.start();
+
+  const workingPath = await findDockerAccessiblePath();
+  if (!workingPath) {
+    pathSpin.fail("No Docker-accessible storage location found");
+    console.log();
+    ui.error("Could not find a location where Docker can store database files.");
+    ui.info("This is unusual. Please check Docker permissions and try again.");
+    process.exit(1);
+  }
+
+  // Update the paths if we found a different working location
+  if (workingPath !== getPgforgeHome()) {
+    setPgforgeHome(workingPath);
+    pathSpin.succeed(`Using storage location: ${workingPath}`);
+  } else {
+    pathSpin.succeed("Storage location verified");
+  }
+
+  // Create all directories with the (possibly updated) path
   const dirSpin = ui.spinner("Creating data directories...");
   dirSpin.start();
   await ensureDirectories();
   dirSpin.succeed("Data directories created");
-
-  // Verify Docker can mount our data directory
-  const mountSpin = ui.spinner("Verifying Docker volume access...");
-  mountSpin.start();
-
-  const mountTest = await testDockerMount(PATHS.databases);
-  if (!mountTest.success) {
-    mountSpin.fail("Docker cannot access data directory");
-    console.log();
-    ui.error("Docker daemon cannot mount the data directory.");
-    console.log();
-    ui.warning(`Path: ${PATHS.databases}`);
-    console.log();
-    ui.info("This often happens in sandboxed environments (CodeSandbox, etc.)");
-    ui.info("where Docker runs outside your container.");
-    console.log();
-    ui.printSection("Solution");
-    console.log("  Set PGFORGE_HOME to a Docker-accessible path:");
-    console.log();
-    console.log("  export PGFORGE_HOME=/tmp/pgforge");
-    console.log("  pgforge setup");
-    console.log();
-    ui.muted("Or use a workspace-relative path that Docker can access.");
-    process.exit(1);
-  }
-  mountSpin.succeed("Docker volume access verified");
 
   // Detect public IP
   const ipSpin = ui.spinner("Detecting public IP address...");
@@ -118,11 +148,12 @@ export async function setup(): Promise<void> {
     ui.info("To expose databases publicly, ensure your server has a public IP.");
   }
 
-  // Save configuration
+  // Save configuration (including the chosen storage path)
   const config = await getConfig();
   config.initialized = true;
   config.publicIp = publicIp;
   config.createdAt = new Date().toISOString();
+  config.pgforgeHome = getPgforgeHome(); // Save the detected/chosen path
   await saveConfig(config);
 
   // Start background daemon and install autostart

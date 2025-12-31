@@ -1,4 +1,4 @@
-import { FILES, WEB_PORT } from "../lib/constants";
+import { getFiles, WEB_PORT } from "../lib/constants";
 import { getState, getAllDatabases } from "../lib/fs";
 import { getContainerStatus, startDatabase, stopDatabase, getDatabaseStats, getDockerPath } from "../lib/docker";
 import { getPublicIp } from "../lib/network";
@@ -8,7 +8,8 @@ import { create } from "./create";
 import * as ui from "../lib/ui";
 import { PANEL_HTML } from "../web/panel";
 
-const WEB_CONFIG_FILE = FILES.webConfig;
+// Dynamic getter for web config file - resolved at runtime after setup
+const getWebConfigFile = () => getFiles().webConfig;
 
 interface WebConfig {
   enabled: boolean;
@@ -18,7 +19,7 @@ interface WebConfig {
 
 async function getWebConfig(): Promise<WebConfig> {
   try {
-    const file = Bun.file(WEB_CONFIG_FILE);
+    const file = Bun.file(getWebConfigFile());
     if (await file.exists()) {
       return await file.json();
     }
@@ -27,7 +28,7 @@ async function getWebConfig(): Promise<WebConfig> {
 }
 
 async function saveWebConfig(config: WebConfig): Promise<void> {
-  await Bun.write(WEB_CONFIG_FILE, JSON.stringify(config, null, 2));
+  await Bun.write(getWebConfigFile(), JSON.stringify(config, null, 2));
 }
 
 async function hashPassword(password: string): Promise<string> {
