@@ -5,7 +5,7 @@ import { join } from "path";
 // VERSION
 // =============================================================================
 
-export const VERSION = "2.0.4";
+export const VERSION = "2.0.5";
 export const STATE_VERSION = 1; // Increment when state schema changes
 
 // =============================================================================
@@ -13,7 +13,8 @@ export const STATE_VERSION = 1; // Increment when state schema changes
 // =============================================================================
 
 // Base directory for all PgForge data
-export const PGFORGE_HOME = join(homedir(), ".pgforge");
+// Can be overridden with PGFORGE_HOME environment variable
+export const PGFORGE_HOME = process.env.PGFORGE_HOME || join(homedir(), ".pgforge");
 
 // Subdirectories
 export const PATHS = {
