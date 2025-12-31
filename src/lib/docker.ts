@@ -40,6 +40,43 @@ export async function getDockerPath(): Promise<string> {
 }
 
 /**
+ * Test if Docker can mount a given host path
+ * This catches issues where Docker daemon runs outside the user's container/sandbox
+ * (common in CodeSandbox, GitPod, and similar environments)
+ */
+export async function testDockerMount(hostPath: string): Promise<{ success: boolean; error?: string }> {
+  const d = await docker();
+
+  // Create a test file in the host path
+  const testFile = `${hostPath}/.docker-mount-test-${Date.now()}`;
+  try {
+    await Bun.write(testFile, "test");
+  } catch (err) {
+    return { success: false, error: `Cannot write to ${hostPath}` };
+  }
+
+  // Try to run a container that mounts this path and reads the test file
+  const result = await Bun.$`${{ raw: d }} run --rm -v ${hostPath}:/mnt alpine cat /mnt/.docker-mount-test-${Date.now().toString().slice(0, -3)}`.quiet().nothrow();
+
+  // Clean up test file
+  await Bun.$`rm -f ${testFile}`.quiet().nothrow();
+
+  // If the container failed to start with "permission denied" or similar, the mount failed
+  const stderr = result.stderr.toString().toLowerCase();
+  if (stderr.includes("permission denied") || stderr.includes("error while creating mount")) {
+    return { success: false, error: "Docker cannot mount this path" };
+  }
+
+  // Even if cat fails (file timing issue), if the container started without mount error, we're good
+  // A mount error would prevent the container from starting at all
+  if (result.exitCode !== 0 && stderr.includes("mount")) {
+    return { success: false, error: stderr };
+  }
+
+  return { success: true };
+}
+
+/**
  * Check if Docker is installed and running
  */
 export async function checkDocker(): Promise<{

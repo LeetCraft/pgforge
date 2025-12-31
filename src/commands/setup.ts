@@ -78,6 +78,32 @@ export async function setup(): Promise<void> {
   await ensureDirectories();
   dirSpin.succeed("Data directories created");
 
+  // Verify Docker can mount our data directory
+  const mountSpin = ui.spinner("Verifying Docker volume access...");
+  mountSpin.start();
+
+  const mountTest = await testDockerMount(PATHS.databases);
+  if (!mountTest.success) {
+    mountSpin.fail("Docker cannot access data directory");
+    console.log();
+    ui.error("Docker daemon cannot mount the data directory.");
+    console.log();
+    ui.warning(`Path: ${PATHS.databases}`);
+    console.log();
+    ui.info("This often happens in sandboxed environments (CodeSandbox, etc.)");
+    ui.info("where Docker runs outside your container.");
+    console.log();
+    ui.printSection("Solution");
+    console.log("  Set PGFORGE_HOME to a Docker-accessible path:");
+    console.log();
+    console.log("  export PGFORGE_HOME=/tmp/pgforge");
+    console.log("  pgforge setup");
+    console.log();
+    ui.muted("Or use a workspace-relative path that Docker can access.");
+    process.exit(1);
+  }
+  mountSpin.succeed("Docker volume access verified");
+
   // Detect public IP
   const ipSpin = ui.spinner("Detecting public IP address...");
   ipSpin.start();
