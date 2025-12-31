@@ -160,24 +160,25 @@ export function generateInitScript(options: {
   const { username, password, database } = options;
 
   // Create a non-superuser with full access to the database but no dangerous privileges
+  // Note: Username is quoted with double quotes because it may contain hyphens
   return `#!/bin/bash
 set -e
 
 psql -v ON_ERROR_STOP=1 --username "pgadmin" --dbname "${database}" <<-EOSQL
   -- Create application user (NOT a superuser)
-  CREATE USER ${username} WITH PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+  CREATE USER "${username}" WITH PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE;
 
   -- Grant full access to the database
-  GRANT ALL PRIVILEGES ON DATABASE ${database} TO ${username};
+  GRANT ALL PRIVILEGES ON DATABASE "${database}" TO "${username}";
 
   -- Grant schema permissions
-  GRANT ALL ON SCHEMA public TO ${username};
-  GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${username};
-  GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${username};
+  GRANT ALL ON SCHEMA public TO "${username}";
+  GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${username}";
+  GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${username}";
 
   -- Set default privileges for future objects
-  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${username};
-  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${username};
+  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${username}";
+  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${username}";
 EOSQL
 `;
 }
