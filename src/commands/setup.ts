@@ -1,11 +1,16 @@
-import { checkDocker } from "../lib/docker";
+import { checkDocker, testDockerMount } from "../lib/docker";
 import { ensureDirectories, getConfig, saveConfig } from "../lib/fs";
 import { getPublicIp } from "../lib/network";
 import { ensureDaemonRunning, installAutostart } from "../lib/daemon";
+import { PATHS } from "../lib/constants";
 import * as ui from "../lib/ui";
 
 export async function setup(): Promise<void> {
   ui.printBanner();
+
+  console.log();
+  ui.muted("This may take a moment on slower systems. Please be patient...");
+  console.log();
 
   const spin = ui.spinner("Checking system requirements...");
   spin.start();
