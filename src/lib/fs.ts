@@ -51,20 +51,55 @@ function migrateState(data: unknown, currentVersion: number): State {
 // =============================================================================
 
 /**
- * Ensures all required directories exist
+ * Ensures all required directories exist with proper permissions
+ * Creates all necessary directories for pgforge operation
  */
 export async function ensureDirectories(): Promise<void> {
   for (const path of Object.values(PATHS)) {
-    await Bun.file(path).exists() || await Bun.$`mkdir -p ${path}`.quiet();
+    const exists = await Bun.file(path).exists().catch(() => false);
+    if (!exists) {
+      await Bun.$`mkdir -p ${path}`.quiet();
+    }
   }
+
+  // Ensure the databases directory has permissions that allow Docker to create mount points
+  // This is critical for environments where Docker runs as a different user
+  await Bun.$`chmod 755 ${PATHS.databases}`.quiet().nothrow();
 }
 
 /**
- * Ensures a database-specific directory exists
+ * Ensures a database-specific directory exists with proper permissions
+ * Creates data, backups, and init directories with permissions that allow Docker to use them
  */
 export async function ensureDatabaseDir(dbName: string): Promise<string> {
   const dbPath = `${PATHS.databases}/${dbName}`;
-  await Bun.$`mkdir -p ${dbPath}/data ${dbPath}/backups`.quiet();
+
+  // Create all required subdirectories
+  const mkdirResult = await Bun.$`mkdir -p ${dbPath}/data ${dbPath}/backups ${dbPath}/init`.quiet().nothrow();
+  if (mkdirResult.exitCode !== 0) {
+    throw new Error(
+      `Failed to create database directory: ${dbPath}\n` +
+      `Error: ${mkdirResult.stderr.toString()}\n` +
+      `Tip: Check that you have write permissions to ${PATHS.databases}\n` +
+      `You can set a custom location with: export PGFORGE_HOME=/path/to/writable/dir`
+    );
+  }
+
+  // Set permissions to 777 for the data directory so Docker can write to it
+  // This is necessary because Docker may run as a different user (e.g., root or postgres UID 999)
+  // The data directory will be chown'd by postgres container on first run anyway
+  await Bun.$`chmod 777 ${dbPath}/data`.quiet().nothrow();
+
+  // Verify the directory was created and is accessible
+  const dataExists = await Bun.file(`${dbPath}/data`).exists().catch(() => false);
+  if (!dataExists) {
+    throw new Error(
+      `Database directory was not created properly: ${dbPath}/data\n` +
+      `This may be a permissions issue. Try:\n` +
+      `  export PGFORGE_HOME=/tmp/pgforge  # or another writable directory`
+    );
+  }
+
   return dbPath;
 }
 

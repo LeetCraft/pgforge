@@ -62,13 +62,42 @@ export async function releasePort(dbName: string): Promise<void> {
 }
 
 /**
- * Check if a port is available
+ * Check if a port is available on the system
+ * Uses multiple methods to ensure accuracy:
+ * 1. ss (socket statistics) - works for all processes including Docker
+ * 2. Docker port bindings - catches containers that may not show in ss
+ * 3. Fallback to lsof if ss is not available
  */
 export async function isPortAvailable(port: number): Promise<boolean> {
   try {
-    const result = await Bun.$`lsof -i :${port}`.quiet().nothrow();
-    return result.exitCode !== 0;
+    // Method 1: Use ss to check TCP listeners (most reliable on Linux)
+    // -t = TCP, -l = listening, -n = numeric ports
+    const ssResult = await Bun.$`ss -tln sport = :${port}`.quiet().nothrow();
+    if (ssResult.exitCode === 0 && ssResult.stdout.toString().includes(`:${port}`)) {
+      return false; // Port is in use
+    }
+
+    // Method 2: Check Docker container port bindings directly
+    // This catches ports bound by containers running as different users
+    const dockerResult = await Bun.$`docker ps --format "{{.Ports}}" 2>/dev/null`.quiet().nothrow();
+    if (dockerResult.exitCode === 0) {
+      const output = dockerResult.stdout.toString();
+      // Match patterns like "0.0.0.0:19006->5432" or "[::]:19006->5432"
+      const portPattern = new RegExp(`(0\\.0\\.0\\.0|\\[::\\]|\\*):${port}->`, 'g');
+      if (portPattern.test(output)) {
+        return false; // Port is bound by a Docker container
+      }
+    }
+
+    // Method 3: Fallback to lsof for non-Docker processes (macOS compatibility)
+    const lsofResult = await Bun.$`lsof -i :${port} -sTCP:LISTEN`.quiet().nothrow();
+    if (lsofResult.exitCode === 0 && lsofResult.stdout.toString().trim().length > 0) {
+      return false; // Port is in use
+    }
+
+    return true; // Port appears to be available
   } catch {
+    // If all checks fail, assume port is available (will fail at Docker bind if not)
     return true;
   }
 }

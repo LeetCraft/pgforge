@@ -39,7 +39,6 @@ export function generateComposeFile(options: ComposeOptions): string {
     // Direct PostgreSQL connection (not recommended for serverless)
     return `# PgForge managed database: ${name}
 # WARNING: Direct PostgreSQL connection - not optimized for serverless
-version: "3.8"
 
 services:
   postgres:
@@ -80,7 +79,6 @@ networks:
 # Architecture: PostgreSQL (internal) -> PgBouncer (exposed)
 # Optimized for serverless environments with connection pooling
 # Security: Application user is NOT a superuser
-version: "3.8"
 
 services:
   postgres:
