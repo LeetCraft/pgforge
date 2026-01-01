@@ -1,12 +1,10 @@
-import { homedir } from "os";
-import { join } from "path";
 import * as ui from "../lib/ui";
 import { VERSION } from "../lib/constants";
 import { stopDaemon, ensureDaemonRunning, isDaemonRunning } from "../lib/daemon";
 
 const REPO = "LeetCraft/pgforge";
 const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
-const INSTALL_DIR = join(homedir(), ".pgforge", "bin");
+const INSTALL_SCRIPT_URL = "https://raw.githubusercontent.com/LeetCraft/pgforge/main/install.sh";
 
 export async function update(): Promise<void> {
   const spin = ui.spinner("Checking for updates...");
@@ -24,10 +22,8 @@ export async function update(): Promise<void> {
       process.exit(1);
     }
 
-    const release = await response.json() as { tag_name: string; assets: Array<{ name: string; browser_download_url: string }> };
+    const release = await response.json() as { tag_name: string };
     const latestVersion = release.tag_name.replace(/^v/, "");
-
-    // Get current version from constants
     const currentVersion = VERSION;
 
     if (latestVersion === currentVersion) {
@@ -36,29 +32,7 @@ export async function update(): Promise<void> {
     }
 
     spin.succeed(`New version available: v${latestVersion} (current: v${currentVersion})`);
-
-    // Verify platform
-    const platform = process.platform;
-    const arch = process.arch;
-
-    if (platform !== "linux" && platform !== "darwin") {
-      ui.error(`Unsupported platform: ${platform}. PgForge supports Linux and macOS.`);
-      process.exit(1);
-    }
-
-    if (arch !== "x64" && arch !== "arm64") {
-      ui.error(`Unsupported architecture: ${arch}. PgForge only supports x64 and arm64.`);
-      process.exit(1);
-    }
-
-    const assetName = `pgforge-${platform}-${arch}`;
-
-    const asset = release.assets.find((a) => a.name === assetName);
-    if (!asset) {
-      ui.error(`No binary found for ${assetName}`);
-      ui.info("Try reinstalling with the install script.");
-      process.exit(1);
-    }
+    console.log();
 
     // Check if daemon is running and stop it
     const daemonWasRunning = await isDaemonRunning();
@@ -71,45 +45,30 @@ export async function update(): Promise<void> {
       } else {
         stopSpin.warn("Could not stop daemon cleanly");
       }
-      // Give it a moment to fully stop
       await Bun.sleep(1000);
     }
 
-    // Download and install
-    const downloadSpin = ui.spinner(`Downloading ${assetName}...`);
-    downloadSpin.start();
+    // Run the install script
+    ui.info("Running install script...");
+    console.log();
 
-    const binaryResponse = await fetch(asset.browser_download_url);
-    if (!binaryResponse.ok) {
-      downloadSpin.fail("Download failed");
+    const result = await Bun.$`curl -fsSL ${INSTALL_SCRIPT_URL} | bash`;
+
+    if (result.exitCode !== 0) {
+      ui.error("Installation failed");
+      console.log();
+      ui.muted("Try running manually:");
+      ui.muted(`curl -fsSL ${INSTALL_SCRIPT_URL} | bash`);
       process.exit(1);
     }
 
-    const binary = await binaryResponse.arrayBuffer();
-    downloadSpin.succeed("Downloaded");
-
-    // Install
-    const installSpin = ui.spinner("Installing...");
-    installSpin.start();
-
-    const installPath = join(INSTALL_DIR, "pgforge");
-    const tempPath = "/tmp/pgforge-update";
-
-    // Ensure install directory exists
-    await Bun.$`mkdir -p ${INSTALL_DIR}`.quiet();
-
-    await Bun.write(tempPath, binary);
-    await Bun.$`chmod +x ${tempPath}`.quiet();
-    await Bun.$`mv ${tempPath} ${installPath}`.quiet();
-
-    installSpin.succeed(`Updated to v${latestVersion}`);
+    console.log();
+    ui.success(`Updated to v${latestVersion}!`);
 
     // Restart daemon if it was running before
     if (daemonWasRunning) {
-      const restartSpin = ui.spinner("Restarting daemon with new version...");
+      const restartSpin = ui.spinner("Restarting daemon...");
       restartSpin.start();
-
-      // Small delay to ensure the new binary is fully in place
       await Bun.sleep(500);
 
       const startResult = await ensureDaemonRunning();
@@ -117,16 +76,18 @@ export async function update(): Promise<void> {
         restartSpin.succeed("Daemon restarted");
       } else {
         restartSpin.fail("Failed to restart daemon");
-        ui.warning("Run 'pgforge settings daemon restart' to manually restart the daemon.");
+        ui.warning("Run 'pgforge settings daemon restart' to manually restart.");
       }
     }
 
     console.log();
-    ui.success("PgForge has been updated!");
     ui.muted("Run 'pgforge --version' to verify.");
   } catch (err) {
     spin.fail("Update failed");
     ui.error(err instanceof Error ? err.message : String(err));
+    console.log();
+    ui.muted("Try reinstalling manually:");
+    ui.muted(`curl -fsSL ${INSTALL_SCRIPT_URL} | bash`);
     process.exit(1);
   }
 }
