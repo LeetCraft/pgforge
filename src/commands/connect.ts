@@ -1,4 +1,3 @@
-import Table from "cli-table3";
 import { getState, getConfig } from "../lib/fs";
 import { getContainerStatus } from "../lib/docker";
 import { buildConnectionUrl } from "../lib/network";
@@ -31,60 +30,7 @@ export async function connect(): Promise<void> {
 
   spin.stop();
 
-  console.log();
-  ui.printSection("Database Connections");
-  console.log();
-
-  // Create detailed table
-  const table = new Table({
-    head: [
-      ui.brand.primary("Name"),
-      ui.brand.primary("Status"),
-      ui.brand.primary("Port"),
-      ui.brand.primary("Username"),
-      ui.brand.primary("Password"),
-    ],
-    style: {
-      head: [],
-      border: ["gray"],
-    },
-    chars: {
-      top: "─",
-      "top-mid": "┬",
-      "top-left": "┌",
-      "top-right": "┐",
-      bottom: "─",
-      "bottom-mid": "┴",
-      "bottom-left": "└",
-      "bottom-right": "┘",
-      left: "│",
-      "left-mid": "├",
-      mid: "─",
-      "mid-mid": "┼",
-      right: "│",
-      "right-mid": "┤",
-      middle: "│",
-    },
-    wordWrap: true,
-  });
-
-  for (const db of databases) {
-    table.push([
-      ui.brand.primary(db.name),
-      ui.formatStatus(db.status),
-      db.port.toString(),
-      db.username,
-      db.password,
-    ]);
-  }
-
-  console.log(table.toString());
-  console.log();
-
-  // Print connection URLs
-  ui.printSection("Connection URLs");
-  console.log();
-
+  // Display each database with its own section box
   for (const db of databases) {
     const url = buildConnectionUrl({
       host: publicIp,
@@ -94,16 +40,25 @@ export async function connect(): Promise<void> {
       database: db.database,
     });
 
-    const statusIcon = db.status === "running" ? ui.brand.success("●") : ui.brand.warning("○");
-    console.log(`${statusIcon} ${ui.brand.primary(db.name)}`);
-    console.log(`  ${ui.brand.highlight(url)}`);
-    console.log();
+    const statusIcon = db.status === "running" ? "🟢" : "🔴";
+
+    ui.printSectionBox(`${db.name}`, [
+      { label: "Status", value: db.status, color: db.status === "running" ? "success" : "warning" },
+      { label: "Host", value: publicIp, color: "white" },
+      { label: "Port", value: db.port.toString(), color: "white" },
+      { label: "Username", value: db.username, color: "white" },
+      { label: "Password", value: db.password, color: "warning" },
+      { label: "Database", value: db.database, color: "white" },
+    ], statusIcon);
+
+    ui.printSectionBox("Connection URL", [
+      { label: "PostgreSQL", value: url, color: "highlight" },
+    ]);
   }
 
   // Usage examples
-  ui.printDivider();
   console.log();
-  ui.printSection("Quick Copy");
+  ui.printSection("Usage Examples");
   console.log();
 
   const firstDb = databases[0];
@@ -116,14 +71,14 @@ export async function connect(): Promise<void> {
   });
 
   ui.muted("  # Connect with psql");
-  console.log(`  psql "${firstUrl}"`);
+  console.log(`  ${ui.brand.highlight(`psql "${firstUrl}"`)}`);
   console.log();
 
   ui.muted("  # Set as environment variable");
-  console.log(`  export DATABASE_URL="${firstUrl}"`);
+  console.log(`  ${ui.brand.highlight(`export DATABASE_URL="${firstUrl}"`)}`);
   console.log();
 
   ui.muted("  # In your .env file");
-  console.log(`  DATABASE_URL=${firstUrl}`);
+  console.log(`  ${ui.brand.highlight(`DATABASE_URL=${firstUrl}`)}`);
   console.log();
 }

@@ -55,36 +55,36 @@ export async function inspect(options: InspectOptions): Promise<void> {
     database: db.database,
   });
 
-  console.log();
+  // Status section
+  const statusIcon = status === "running" ? "🟢" : "🔴";
+  const statusItems = [
+    { label: "Status", value: status, color: status === "running" ? "success" : "warning" as const },
+    { label: "Created", value: new Date(db.createdAt).toLocaleString(), color: "muted" as const },
+  ];
 
-  // Header
-  ui.printSection(`Database: ${dbName}`);
-  console.log();
-
-  // Status
-  ui.printKeyValue("Status", ui.formatStatus(status));
-  ui.printKeyValue("Created", new Date(db.createdAt).toLocaleString());
   if (db.stoppedAt) {
-    ui.printKeyValue("Stopped", new Date(db.stoppedAt).toLocaleString());
+    statusItems.push({ label: "Stopped", value: new Date(db.stoppedAt).toLocaleString(), color: "muted" as const });
   }
 
-  console.log();
-  ui.printSection("Connection");
-  ui.printKeyValue("Host", publicIp);
-  ui.printKeyValue("Port", db.port.toString());
-  ui.printKeyValue("Username", db.username);
-  ui.printKeyValue("Password", db.password);
-  ui.printKeyValue("Database", db.database);
-  ui.printKeyValue("Pooler", db.poolerEnabled ? "Enabled (PgBouncer)" : "Disabled");
+  ui.printSectionBox(`Database: ${dbName}`, statusItems, statusIcon);
+
+  // Connection details
+  ui.printSectionBox("Connection Details", [
+    { label: "Host", value: publicIp, color: "white" },
+    { label: "Port", value: db.port.toString(), color: "white" },
+    { label: "Username", value: db.username, color: "white" },
+    { label: "Password", value: db.password, color: "warning" },
+    { label: "Database", value: db.database, color: "white" },
+    { label: "Pooler", value: db.poolerEnabled ? "Enabled (PgBouncer)" : "Disabled", color: "muted" },
+  ], "🔌");
 
   // Connection URL
-  ui.printConnectionUrl(url);
+  ui.printSectionBox("Connection URL", [
+    { label: "PostgreSQL", value: url, color: "highlight" },
+  ]);
 
   // Get stats if running
   if (status === "running") {
-    console.log();
-    ui.printSection("Statistics");
-
     const spin = ui.spinner("Fetching stats...");
     spin.start();
 
@@ -92,44 +92,54 @@ export async function inspect(options: InspectOptions): Promise<void> {
       const stats = await getDatabaseStats(dbName, db.database);
       spin.stop();
 
-      ui.printKeyValue("Size", stats.size);
-      ui.printKeyValue("Tables", stats.tables.toString());
-      ui.printKeyValue("Connections", stats.connections.toString());
+      ui.printSectionBox("Statistics", [
+        { label: "Size", value: stats.size, color: "white" },
+        { label: "Tables", value: stats.tables.toString(), color: "white" },
+        { label: "Connections", value: stats.connections.toString(), color: "white" },
+      ], "📊");
     } catch {
       spin.stop();
-      ui.muted("  Could not fetch statistics");
+      console.log();
+      ui.muted("Could not fetch statistics");
     }
   }
 
   // Paths
-  console.log();
-  ui.printSection("Paths");
-  ui.printKeyValue("Data", `${dbPath}/data`);
-  ui.printKeyValue("Backups", `${dbPath}/backups`);
-  ui.printKeyValue("Compose", `${dbPath}/docker-compose.yml`);
+  ui.printSectionBox("Paths", [
+    { label: "Data", value: `${dbPath}/data`, color: "muted" },
+    { label: "Backups", value: `${dbPath}/backups`, color: "muted" },
+    { label: "Compose", value: `${dbPath}/docker-compose.yml`, color: "muted" },
+  ], "📁");
 
   // Docker info
-  console.log();
-  ui.printSection("Docker");
-  ui.printKeyValue("PostgreSQL", `pgforge-${dbName}-pg`);
+  const dockerItems = [
+    { label: "PostgreSQL", value: `pgforge-${dbName}-pg`, color: "muted" as const },
+  ];
+
   if (db.poolerEnabled) {
-    ui.printKeyValue("PgBouncer", `pgforge-${dbName}-bouncer`);
+    dockerItems.push({ label: "PgBouncer", value: `pgforge-${dbName}-bouncer`, color: "muted" as const });
   }
-  ui.printKeyValue("Network", `pgforge-${dbName}-internal`);
-  ui.printKeyValue("PG Version", db.pgVersion);
+
+  dockerItems.push(
+    { label: "Network", value: `pgforge-${dbName}-internal`, color: "muted" as const },
+    { label: "PG Version", value: db.pgVersion, color: "muted" as const }
+  );
+
+  ui.printSectionBox("Docker", dockerItems, "🐳");
 
   // Show logs if requested
   if (options.logs) {
     console.log();
-    ui.printSection("Recent Logs");
+    ui.printSection("Recent Logs (last 20 lines)");
     console.log();
 
     const logs = await getContainerLogs(dbName, 20);
     if (logs.trim()) {
       console.log(ui.brand.muted(logs));
     } else {
-      ui.muted("  No logs available");
+      ui.muted("No logs available");
     }
+    console.log();
   }
 
   console.log();

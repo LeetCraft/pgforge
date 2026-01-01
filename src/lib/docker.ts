@@ -118,7 +118,7 @@ export async function startDatabase(dbName: string): Promise<void> {
   const dbPath = getDatabasePath(dbName);
   const d = await docker();
 
-  await Bun.$`${{ raw: d }} compose -f ${composePath} -p pgforge-${dbName} up -d`.cwd(dbPath);
+  await Bun.$`${{ raw: d }} compose -f ${composePath} -p pgforge-${dbName} up -d`.cwd(dbPath).quiet();
 }
 
 /**
@@ -129,7 +129,7 @@ export async function stopDatabase(dbName: string): Promise<void> {
   const dbPath = getDatabasePath(dbName);
   const d = await docker();
 
-  await Bun.$`${{ raw: d }} compose -f ${composePath} -p pgforge-${dbName} stop`.cwd(dbPath);
+  await Bun.$`${{ raw: d }} compose -f ${composePath} -p pgforge-${dbName} stop`.cwd(dbPath).quiet();
 }
 
 /**

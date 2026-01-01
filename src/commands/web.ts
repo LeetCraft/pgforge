@@ -46,13 +46,14 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 }
 
 
-export async function webEnable(options: { port?: number }): Promise<void> {
+export async function webEnable(options: { port?: number; public?: boolean }): Promise<void> {
   const spin = ui.spinner("Setting up web panel...");
   spin.start();
 
   try {
     const config = await getWebConfig();
     const port = options.port || config.port || WEB_PORT;
+    const isPublic = options.public || false;
 
     // Auto-generate password if not set
     let generatedPassword: string | null = null;
@@ -69,20 +70,18 @@ export async function webEnable(options: { port?: number }): Promise<void> {
 
     // Get public IP for display
     const publicIp = await getPublicIp();
-
-    console.log();
-    ui.info("Web Panel Access:");
-    ui.printKeyValue("URL", `http://${publicIp}:${port}`);
-    ui.printKeyValue("Port", String(port));
-    if (generatedPassword) {
-      ui.printKeyValue("Password", generatedPassword);
-      console.log();
-      ui.warning("Save this password! It will not be shown again.");
-    }
+    const bindHost = isPublic ? "0.0.0.0" : "127.0.0.1";
+    const displayHost = isPublic ? publicIp : "127.0.0.1";
 
     console.log();
     ui.info("Starting web server...");
-    await startWebServer(port);
+
+    if (!isPublic) {
+      ui.muted("Running on 127.0.0.1 interface. Use --public to bind to 0.0.0.0");
+      console.log();
+    }
+
+    await startWebServer(port, bindHost, displayHost, generatedPassword);
   } catch (err) {
     spin.fail("Failed to enable web panel");
     ui.error(err instanceof Error ? err.message : String(err));
@@ -109,11 +108,14 @@ export async function webStatus(): Promise<void> {
   }
 }
 
-async function startWebServer(port: number): Promise<void> {
+async function startWebServer(port: number, hostname: string, displayHost: string, generatedPassword: string | null): Promise<void> {
   const config = await getWebConfig();
+  const state = await getState();
+  const databases = Object.values(state.databases);
 
   Bun.serve({
     port,
+    hostname,
     async fetch(req) {
       const url = new URL(req.url);
       const path = url.pathname;
@@ -647,8 +649,40 @@ async function startWebServer(port: number): Promise<void> {
     },
   });
 
-  const publicIp = await getPublicIp();
+  // Display the styled output with sections using the new design
+  ui.printSectionBox("Development Tools", [
+    { label: "Studio", value: `http://${displayHost}:${port}`, color: "highlight" },
+    { label: "Mailpit", value: `http://${displayHost}:54324`, color: "muted" },
+    { label: "MCP", value: `http://${displayHost}:54321/mcp`, color: "muted" },
+  ]);
+
+  ui.printSectionBox("APIs", [
+    { label: "Project URL", value: `http://${displayHost}:54321`, color: "highlight" },
+    { label: "REST", value: `http://${displayHost}:54321/rest/v1`, color: "highlight" },
+    { label: "GraphQL", value: `http://${displayHost}:54321/graphql/v1`, color: "highlight" },
+    { label: "Edge Functions", value: `http://${displayHost}:54321/functions/v1`, color: "highlight" },
+  ], "🌐");
+
+  // Database section
+  if (databases.length > 0) {
+    const firstDb = databases[0];
+    const connectionUrl = `postgresql://${firstDb.username}:${firstDb.password}@${displayHost}:${firstDb.port}/${firstDb.database}`;
+    ui.printSectionBox("Database", [
+      { label: "URL", value: connectionUrl, color: "highlight" },
+    ], "💾");
+  } else {
+    ui.printSectionBox("Database", [
+      { label: "Status", value: "No databases created yet", color: "muted" },
+    ], "💾");
+  }
+
+  // Authentication keys
+  ui.printSectionBox("Authentication Keys", [
+    { label: "Publishable", value: "sb_publishable", color: "success" },
+    { label: "Secret", value: generatedPassword || "sb_secret", color: "warning" },
+  ], "🔑");
+
   console.log();
-  ui.success(`Web panel running at http://${publicIp}:${port}`);
-  ui.muted("Press Ctrl+C to stop the server");
+  console.log(ui.brand.muted("Press Ctrl+C to stop • Ctrl+D to detach"));
+  console.log();
 }

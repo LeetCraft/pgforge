@@ -5,7 +5,7 @@ import { join } from "path";
 // VERSION
 // =============================================================================
 
-export const VERSION = "2.0.11";
+export const VERSION = "2.1.0";
 export const STATE_VERSION = 1; // Increment when state schema changes
 
 // =============================================================================
@@ -111,7 +111,7 @@ export const LIMITS = {
 // =============================================================================
 
 // Web panel port (fixed)
-export const WEB_PORT = 19000;
+export const WEB_PORT = 56432;
 
 // Port range for databases (each db gets a unique port)
 // Range: 19001-19999 (999 available ports)

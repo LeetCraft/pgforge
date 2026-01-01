@@ -169,21 +169,25 @@ export async function create(options: CreateOptions): Promise<void> {
   state.databases[name] = dbState;
   await saveState(state);
 
-  // Print success
+  // Print success with new boxed design
   console.log();
   ui.success(`Database "${name}" created successfully!`);
 
-  ui.printCredentials({
-    name,
-    host: publicIp!,
-    port,
-    username,
-    password,
-    database,
-    url: connectionUrl,
-  });
+  ui.printSectionBox("Database Credentials", [
+    { label: "Name", value: name, color: "white" },
+    { label: "Host", value: publicIp!, color: "white" },
+    { label: "Port", value: port.toString(), color: "white" },
+    { label: "Username", value: username, color: "white" },
+    { label: "Password", value: password, color: "warning" },
+    { label: "Database", value: database, color: "white" },
+  ], "🐘");
+
+  ui.printSectionBox("Connection", [
+    { label: "URL", value: connectionUrl, color: "highlight" },
+  ]);
 
   if (!noPooler) {
+    console.log();
     ui.info("Connection pooling (PgBouncer) is enabled for serverless compatibility.");
   }
 

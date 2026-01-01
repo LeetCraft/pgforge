@@ -8,9 +8,11 @@ export async function list(): Promise<void> {
   const databases = Object.values(state.databases);
 
   if (databases.length === 0) {
+    console.log();
     ui.info("No databases found.");
     console.log();
     ui.muted("Create one with: pgforge create --name myapp");
+    console.log();
     return;
   }
 
@@ -34,8 +36,8 @@ export async function list(): Promise<void> {
     table.push([
       ui.brand.primary(db.name),
       ui.formatStatus(db.status),
-      db.port.toString(),
-      ui.formatRelativeTime(db.createdAt),
+      ui.brand.muted(db.port.toString()),
+      ui.brand.muted(ui.formatRelativeTime(db.createdAt)),
     ]);
   }
 
@@ -43,11 +45,12 @@ export async function list(): Promise<void> {
   console.log(table.toString());
   console.log();
 
-  // Port summary
+  // Port summary with better formatting
   const portSummary = await getPortSummary();
   ui.muted(
-    `${databases.length} database(s) | ` +
-    `${portSummary.used}/${portSummary.total} ports used | ` +
+    `${databases.length} database(s) • ` +
+    `${portSummary.used}/${portSummary.total} ports used • ` +
     `${portSummary.available} available`
   );
+  console.log();
 }

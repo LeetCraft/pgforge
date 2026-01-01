@@ -235,6 +235,43 @@ export function printDivider(): void {
 }
 
 /**
+ * Print a clean section box with title and key-value pairs (matching screenshot design)
+ */
+export function printSectionBox(title: string, items: Array<{ label: string; value: string; color?: 'highlight' | 'success' | 'warning' | 'muted' | 'white' }>, icon?: string): void {
+  const titleText = icon ? `${icon} ${title}` : title;
+  const maxLabelWidth = Math.max(...items.map(item => item.label.length));
+
+  console.log();
+  console.log(brand.primary(`┌─ ${titleText}`));
+  console.log(brand.primary("│"));
+
+  items.forEach(item => {
+    const paddedLabel = item.label.padEnd(maxLabelWidth);
+    let valueColor;
+    switch (item.color) {
+      case 'highlight':
+        valueColor = brand.highlight(item.value);
+        break;
+      case 'success':
+        valueColor = brand.success(item.value);
+        break;
+      case 'warning':
+        valueColor = brand.warning(item.value);
+        break;
+      case 'muted':
+        valueColor = brand.muted(item.value);
+        break;
+      default:
+        valueColor = chalk.white(item.value);
+    }
+    console.log(brand.primary("│ ") + brand.muted(paddedLabel) + "  " + valueColor);
+  });
+
+  console.log(brand.primary("│"));
+  console.log(brand.primary("└" + "─".repeat(Math.max(titleText.length + 2, 52))));
+}
+
+/**
  * Confirm action with user
  */
 export async function confirm(message: string): Promise<boolean> {

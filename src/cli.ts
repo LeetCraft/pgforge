@@ -178,6 +178,7 @@ web
   .command("enable")
   .description("Enable and start the web panel")
   .option("-p, --port <port>", "Port to run on")
+  .option("--public", "Bind to 0.0.0.0 interface (default: 127.0.0.1)")
   .action(async (options) => {
     let port = options.port ? parseInt(options.port, 10) : undefined;
 
@@ -197,7 +198,7 @@ web
       port = inputPort > 0 && inputPort < 65536 ? inputPort : 3000;
     }
 
-    await webEnable({ port });
+    await webEnable({ port, public: options.public || false });
   });
 
 web
