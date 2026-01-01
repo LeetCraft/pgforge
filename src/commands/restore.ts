@@ -148,15 +148,14 @@ export async function restore(options: RestoreOptions): Promise<void> {
     spin.stop();
 
     // 5. Display backup info
-    console.log();
-    ui.info("Backup Information:");
-    ui.printKeyValue("Original Name", metadata.name);
-    ui.printKeyValue("Database", metadata.database);
-    ui.printKeyValue("Username", metadata.username);
-    ui.printKeyValue("PostgreSQL", metadata.pgVersion);
-    ui.printKeyValue("Created", new Date(metadata.createdAt).toLocaleString());
-    ui.printKeyValue("Exported", new Date(metadata.exportedAt).toLocaleString());
-    console.log();
+    ui.printSectionBox("Backup Information", [
+      { label: "Original Name", value: metadata.name, color: "white" },
+      { label: "Database", value: metadata.database, color: "white" },
+      { label: "Username", value: metadata.username, color: "white" },
+      { label: "PostgreSQL", value: metadata.pgVersion, color: "muted" },
+      { label: "Created", value: new Date(metadata.createdAt).toLocaleString(), color: "muted" },
+      { label: "Exported", value: new Date(metadata.exportedAt).toLocaleString(), color: "muted" },
+    ], "📦");
 
     // 6. Determine target database name
     const targetName = options.name || metadata.name;
@@ -279,13 +278,17 @@ export async function restore(options: RestoreOptions): Promise<void> {
     // 16. Display connection info
     console.log();
     ui.success(`Database "${targetName}" restored and running`);
-    console.log();
-    ui.printKeyValue("Port", String(port));
-    ui.printKeyValue("Username", metadata.username);
-    ui.printKeyValue("Password", metadata.password);
-    ui.printKeyValue("Database", metadata.database);
+
+    ui.printSectionBox("Connection Details", [
+      { label: "Port", value: String(port), color: "white" },
+      { label: "Username", value: metadata.username, color: "white" },
+      { label: "Password", value: metadata.password, color: "warning" },
+      { label: "Database", value: metadata.database, color: "white" },
+    ], "🔌");
+
     console.log();
     ui.muted("Use 'pgforge connect' to see full connection details.");
+    console.log();
   } catch (err) {
     spin.fail("Restore failed");
     ui.error(err instanceof Error ? err.message : String(err));

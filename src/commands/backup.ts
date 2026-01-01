@@ -209,14 +209,16 @@ export async function backup(options: BackupOptions): Promise<void> {
     const file = Bun.file(outputPath);
     const size = await file.size;
 
+    ui.printSectionBox("Backup Complete", [
+      { label: "Database", value: dbName, color: "white" },
+      { label: "File", value: outputPath, color: "highlight" },
+      { label: "Size", value: ui.formatBytes(size), color: "white" },
+      { label: "Encrypted", value: encryptionPassword ? "Yes" : "No", color: encryptionPassword ? "success" : "muted" },
+    ], "💾");
+
     console.log();
-    ui.printKeyValue("Database", dbName);
-    ui.printKeyValue("File", outputPath);
-    ui.printKeyValue("Size", ui.formatBytes(size));
-    ui.printKeyValue("Encrypted", encryptionPassword ? "Yes" : "No");
-    console.log();
-    ui.success("Backup complete");
     ui.muted("Use 'pgforge restore --path <file>' to restore on any PgForge installation.");
+    console.log();
   } catch (err) {
     spin.fail(`Failed to backup ${dbName}`);
     ui.error(err instanceof Error ? err.message : String(err));
