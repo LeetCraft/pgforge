@@ -5,7 +5,7 @@ import { join } from "path";
 // VERSION
 // =============================================================================
 
-export const VERSION = "2.1.2";
+export const VERSION = "2.1.3";
 export const STATE_VERSION = 1; // Increment when state schema changes
 
 // =============================================================================
@@ -63,6 +63,9 @@ export function getFiles() {
     daemonLock: join(paths.state, "daemon.lock"),
     daemonLog: join(paths.state, "daemon.log"),
     daemonHealth: join(paths.state, "daemon.health"),
+
+    // Web server files
+    webPid: join(paths.state, "web.pid"),
   };
 }
 

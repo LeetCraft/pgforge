@@ -10,6 +10,7 @@ import { PANEL_HTML } from "../web/panel";
 
 // Dynamic getter for web config file - resolved at runtime after setup
 const getWebConfigFile = () => getFiles().webConfig;
+const getWebPidFile = () => getFiles().webPid;
 
 interface WebConfig {
   enabled: boolean;
@@ -94,8 +95,38 @@ export async function webDisable(): Promise<void> {
   config.enabled = false;
   await saveWebConfig(config);
 
-  ui.success("Web panel disabled");
-  ui.info("Restart required to stop the web server");
+  // Try to stop the running web server process
+  const pidFile = getWebPidFile();
+  try {
+    const file = Bun.file(pidFile);
+    if (await file.exists()) {
+      const pidContent = await file.text();
+      const pid = parseInt(pidContent.trim(), 10);
+      if (!isNaN(pid)) {
+        // Check if process is running
+        const checkResult = await Bun.$`kill -0 ${pid}`.quiet().nothrow();
+        if (checkResult.exitCode === 0) {
+          // Process is running, kill it
+          await Bun.$`kill -TERM ${pid}`.quiet().nothrow();
+          // Wait a moment and force kill if needed
+          await Bun.sleep(500);
+          const stillRunning = await Bun.$`kill -0 ${pid}`.quiet().nothrow();
+          if (stillRunning.exitCode === 0) {
+            await Bun.$`kill -KILL ${pid}`.quiet().nothrow();
+          }
+          ui.success("Web panel stopped");
+        } else {
+          ui.success("Web panel disabled");
+        }
+      }
+      // Clean up PID file
+      await Bun.$`rm -f ${pidFile}`.quiet().nothrow();
+    } else {
+      ui.success("Web panel disabled");
+    }
+  } catch {
+    ui.success("Web panel disabled");
+  }
 }
 
 export async function webStatus(): Promise<void> {
@@ -112,6 +143,16 @@ async function startWebServer(port: number, hostname: string, displayHost: strin
   const config = await getWebConfig();
   const state = await getState();
   const databases = Object.values(state.databases);
+
+  // Write PID file so we can stop the server later
+  await Bun.write(getWebPidFile(), String(process.pid));
+
+  // Clean up PID file on exit
+  const cleanup = () => {
+    Bun.$`rm -f ${getWebPidFile()}`.quiet().nothrow();
+  };
+  process.on("SIGTERM", () => { cleanup(); process.exit(0); });
+  process.on("SIGINT", () => { cleanup(); process.exit(0); });
 
   Bun.serve({
     port,
