@@ -4,6 +4,8 @@ bun.lock
 
 # Build output
 dist/
+pgforge
+pgforge-*
 easy-db
 easy-db-*
 

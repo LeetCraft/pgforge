@@ -15,6 +15,16 @@ const TARGETS = [
 async function build() {
   console.log(`\n🔨 Building PgForge v${VERSION}\n`);
 
+  // Build web panel first
+  console.log(`🌐 Building web panel...`);
+  const webResult = await Bun.$`bun run scripts/build-web.ts`.quiet().nothrow();
+  if (webResult.exitCode !== 0) {
+    console.error(`❌ Web panel build failed`);
+    console.error(webResult.stderr.toString());
+    process.exit(1);
+  }
+  console.log(`✅ Web panel built`);
+
   // Create dist directory
   await Bun.$`mkdir -p dist`.quiet();
 

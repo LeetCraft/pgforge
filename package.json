@@ -8,7 +8,10 @@
   },
   "scripts": {
     "dev": "bun run src/cli.ts",
-    "build": "bun build --compile src/cli.ts --outfile pgforge",
+    "build:web": "bun run scripts/build-web.ts",
+    "build": "bun run build:web && bun build --compile src/cli.ts --outfile pgforge",
+    "build:linux": "bun run build:web && bun build --compile --target=bun-linux-x64 src/cli.ts --outfile pgforge-linux",
+    "build:all": "bun run build:web && bun build --compile src/cli.ts --outfile pgforge && bun build --compile --target=bun-linux-x64 src/cli.ts --outfile pgforge-linux",
     "build:release": "bun run scripts/build.ts",
     "test": "bun test test/*.test.ts",
     "test:e2e": "bun test test/e2e",
@@ -26,6 +29,10 @@
     "postgres": "^3.4.7"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   }
 }

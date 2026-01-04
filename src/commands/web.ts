@@ -141,8 +141,6 @@ export async function webStatus(): Promise<void> {
 
 async function startWebServer(port: number, hostname: string, displayHost: string, generatedPassword: string | null): Promise<void> {
   const config = await getWebConfig();
-  const state = await getState();
-  const databases = Object.values(state.databases);
 
   // Write PID file so we can stop the server later
   await Bun.write(getWebPidFile(), String(process.pid));
@@ -690,40 +688,19 @@ async function startWebServer(port: number, hostname: string, displayHost: strin
     },
   });
 
-  // Display the styled output with sections using the new design
-  ui.printSectionBox("Development Tools", [
-    { label: "Studio", value: `http://${displayHost}:${port}`, color: "highlight" },
-    { label: "Mailpit", value: `http://${displayHost}:54324`, color: "muted" },
-    { label: "MCP", value: `http://${displayHost}:54321/mcp`, color: "muted" },
+  // Display the web panel URL
+  console.log();
+  ui.printSectionBox("Web Panel", [
+    { label: "URL", value: `http://${displayHost}:${port}`, color: "highlight" },
   ]);
 
-  ui.printSectionBox("APIs", [
-    { label: "Project URL", value: `http://${displayHost}:54321`, color: "highlight" },
-    { label: "REST", value: `http://${displayHost}:54321/rest/v1`, color: "highlight" },
-    { label: "GraphQL", value: `http://${displayHost}:54321/graphql/v1`, color: "highlight" },
-    { label: "Edge Functions", value: `http://${displayHost}:54321/functions/v1`, color: "highlight" },
-  ], "🌐");
-
-  // Database section
-  if (databases.length > 0) {
-    const firstDb = databases[0];
-    const connectionUrl = `postgresql://${firstDb.username}:${firstDb.password}@${displayHost}:${firstDb.port}/${firstDb.database}`;
-    ui.printSectionBox("Database", [
-      { label: "URL", value: connectionUrl, color: "highlight" },
-    ], "💾");
-  } else {
-    ui.printSectionBox("Database", [
-      { label: "Status", value: "No databases created yet", color: "muted" },
-    ], "💾");
+  if (generatedPassword) {
+    ui.printSectionBox("Access", [
+      { label: "Password", value: generatedPassword, color: "warning" },
+    ], "🔑");
   }
 
-  // Authentication keys
-  ui.printSectionBox("Authentication Keys", [
-    { label: "Publishable", value: "sb_publishable", color: "success" },
-    { label: "Secret", value: generatedPassword || "sb_secret", color: "warning" },
-  ], "🔑");
-
   console.log();
-  console.log(ui.brand.muted("Press Ctrl+C to stop • Ctrl+D to detach"));
+  console.log(ui.brand.muted("Press Ctrl+C to stop"));
   console.log();
 }
