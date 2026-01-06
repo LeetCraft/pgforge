@@ -29,7 +29,15 @@ async function buildWebPanel() {
   }
 
   // Get the bundled JavaScript
-  const jsBundle = await result.outputs[0].text();
+  let jsBundle = await result.outputs[0].text();
+
+  // Escape </script> within the JS bundle to prevent breaking HTML structure
+  // Use a technique that doesn't affect actual JS execution
+  jsBundle = jsBundle.replace(/<\/script>/gi, "<\\/script>");
+
+  // Escape $ in jsBundle to prevent special replacement patterns ($&, $`, $', etc.)
+  // $$ in replacement string becomes a literal $
+  const safejsBundle = jsBundle.replace(/\$/g, "$$$$");
 
   // Read the HTML template
   const htmlTemplate = await Bun.file(join(WEB_APP_DIR, "index.html")).text();
@@ -37,7 +45,7 @@ async function buildWebPanel() {
   // Replace the script tag with the inline bundle
   const finalHtml = htmlTemplate.replace(
     /<script type="module" src="\.\/App\.tsx"><\/script>/,
-    `<script>${jsBundle}</script>`
+    `<script>${safejsBundle}</script>`
   );
 
   // Escape backticks and dollar signs for template literal
