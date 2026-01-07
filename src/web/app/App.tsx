@@ -87,6 +87,24 @@ const TableIcon = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
   </svg>
 );
 
+const CloudIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" />
+  </svg>
+);
+
+const TrashIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+  </svg>
+);
+
+const DownloadIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+  </svg>
+);
+
 // Types
 interface Database {
   name: string;
@@ -108,6 +126,25 @@ interface DbStats {
 interface ToastMessage {
   message: string;
   type: "success" | "error";
+}
+
+interface S3Status {
+  configured: boolean;
+  enabled?: boolean;
+  endpoint?: string;
+  bucket?: string;
+  region?: string;
+  intervalHours?: number;
+  lastBackup?: string | null;
+  connectionHealthy?: boolean;
+  connectionError?: string;
+}
+
+interface S3Backup {
+  key: string;
+  database: string;
+  timestamp: string;
+  size: number;
 }
 
 // Toast component
@@ -227,6 +264,12 @@ const Sidebar = ({
           className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${currentPage === "dashboard" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50"}`}
         >
           <ChartIcon />Dashboard
+        </button>
+        <button
+          onClick={() => onNavigate("backups")}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${currentPage === "backups" ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50"}`}
+        >
+          <CloudIcon />Backups
         </button>
       </div>
       <div>
@@ -823,6 +866,349 @@ const ImportModal = ({
   );
 };
 
+// Backups Page
+const Backups = ({
+  password,
+  dbs,
+  showToast
+}: {
+  password: string;
+  dbs: Database[];
+  showToast: (msg: string, type?: "success" | "error") => void;
+}) => {
+  const [s3Status, setS3Status] = useState<S3Status | null>(null);
+  const [backups, setBackups] = useState<S3Backup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [configuring, setConfiguring] = useState(false);
+  const [backing, setBacking] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+  const [s3Url, setS3Url] = useState("");
+  const [intervalHours, setIntervalHours] = useState(24);
+  const [selectedDb, setSelectedDb] = useState<string | null>(null);
+
+  const loadS3Status = useCallback(async () => {
+    try {
+      const r = await api("/s3", password);
+      if (r.ok) setS3Status(await r.json());
+    } catch (e) { console.error(e); }
+  }, [password]);
+
+  const loadBackups = useCallback(async () => {
+    try {
+      const params = selectedDb ? `?database=${encodeURIComponent(selectedDb)}` : "";
+      const r = await api("/s3/backups" + params, password);
+      if (r.ok) setBackups(await r.json());
+    } catch (e) { console.error(e); }
+  }, [password, selectedDb]);
+
+  const handleConfigure = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConfiguring(true);
+    try {
+      const r = await api("/s3", password, {
+        method: "POST",
+        body: JSON.stringify({ url: s3Url, intervalHours })
+      });
+      if (!r.ok) {
+        const d = await r.json();
+        throw new Error(d.error || "Configuration failed");
+      }
+      showToast("S3 backup configured successfully");
+      setShowConfig(false);
+      setS3Url("");
+      await loadS3Status();
+      await loadBackups();
+    } catch (e: any) {
+      showToast(e.message, "error");
+    } finally {
+      setConfiguring(false);
+    }
+  };
+
+  const handleToggleEnabled = async () => {
+    if (!s3Status?.configured) return;
+    try {
+      await api("/s3", password, {
+        method: "POST",
+        body: JSON.stringify({ enabled: !s3Status.enabled })
+      });
+      showToast(s3Status.enabled ? "Backups disabled" : "Backups enabled");
+      await loadS3Status();
+    } catch (e: any) {
+      showToast(e.message, "error");
+    }
+  };
+
+  const handleRemoveConfig = async () => {
+    if (!confirm("Are you sure you want to remove S3 backup configuration?")) return;
+    try {
+      await api("/s3", password, { method: "DELETE" });
+      showToast("S3 configuration removed");
+      await loadS3Status();
+      setBackups([]);
+    } catch (e: any) {
+      showToast(e.message, "error");
+    }
+  };
+
+  const handleBackupNow = async (dbName?: string) => {
+    setBacking(true);
+    try {
+      const r = await api("/s3/backup", password, {
+        method: "POST",
+        body: JSON.stringify(dbName ? { database: dbName } : {})
+      });
+      if (!r.ok) {
+        const d = await r.json();
+        throw new Error(d.error || "Backup failed");
+      }
+      showToast(dbName ? `Backup created for ${dbName}` : "Backup completed for all databases");
+      await loadS3Status();
+      await loadBackups();
+    } catch (e: any) {
+      showToast(e.message, "error");
+    } finally {
+      setBacking(false);
+    }
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([loadS3Status(), loadBackups()]).finally(() => setLoading(false));
+  }, [loadS3Status, loadBackups]);
+
+  const formatTimeAgo = (ts: string | null) => {
+    if (!ts) return "Never";
+    const diff = Date.now() - new Date(ts).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  };
+
+  // Group backups by database
+  const backupsByDb: Record<string, S3Backup[]> = {};
+  backups.forEach(b => {
+    if (!backupsByDb[b.database]) backupsByDb[b.database] = [];
+    backupsByDb[b.database].push(b);
+  });
+
+  if (loading) {
+    return (
+      <div className="fade-in flex items-center justify-center h-64">
+        <span className="w-6 h-6 border-2 border-slate-300 border-t-slate-600 rounded-full spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-in max-w-4xl">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">Backups</h1>
+          <p className="text-slate-400 text-sm">S3-compatible cloud backup</p>
+        </div>
+        {s3Status?.configured && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleBackupNow()}
+              disabled={backing || !s3Status.enabled}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 disabled:opacity-50"
+            >
+              {backing ? (
+                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full spin" />
+              ) : (
+                <UploadIcon className="w-3.5 h-3.5" />
+              )}
+              Backup All
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* S3 Configuration Card */}
+      <div className="bg-white rounded-xl border border-slate-100 p-4 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${s3Status?.configured ? (s3Status.connectionHealthy ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600") : "bg-slate-100 text-slate-400"}`}>
+              <CloudIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">
+                {s3Status?.configured ? "S3 Backup Configured" : "Configure S3 Backup"}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {s3Status?.configured
+                  ? `${s3Status.endpoint} / ${s3Status.bucket}`
+                  : "Connect to AWS S3, Cloudflare R2, or any S3-compatible storage"}
+              </p>
+            </div>
+          </div>
+          {s3Status?.configured ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleToggleEnabled}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${s3Status.enabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+              >
+                {s3Status.enabled ? "Enabled" : "Disabled"}
+              </button>
+              <button
+                onClick={handleRemoveConfig}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              >
+                <TrashIcon className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowConfig(true)}
+              className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-800"
+            >
+              Configure
+            </button>
+          )}
+        </div>
+
+        {s3Status?.configured && (
+          <div className="grid grid-cols-4 gap-4 pt-3 border-t border-slate-100">
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase">Status</div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${s3Status.connectionHealthy ? "bg-emerald-500" : "bg-amber-500"}`} />
+                <span className="text-xs font-medium text-slate-700">{s3Status.connectionHealthy ? "Connected" : "Error"}</span>
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase">Interval</div>
+              <div className="text-xs font-medium text-slate-700 mt-0.5">{s3Status.intervalHours}h</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase">Last Backup</div>
+              <div className="text-xs font-medium text-slate-700 mt-0.5">{formatTimeAgo(s3Status.lastBackup || null)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase">Total Backups</div>
+              <div className="text-xs font-medium text-slate-700 mt-0.5">{backups.length}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Configure Modal */}
+        {showConfig && (
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && setShowConfig(false)}>
+            <div className="bg-white rounded-xl w-full max-w-md fade-in shadow-xl">
+              <div className="p-4 border-b border-slate-100">
+                <h2 className="text-sm font-semibold text-slate-900">Configure S3 Backup</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Enter your S3-compatible storage credentials</p>
+              </div>
+              <form onSubmit={handleConfigure}>
+                <div className="p-4 space-y-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1.5">S3 URL</label>
+                    <input
+                      type="text"
+                      value={s3Url}
+                      onChange={(e) => setS3Url(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-xs font-mono placeholder:text-slate-400 focus:border-slate-400 focus:ring-0 outline-none"
+                      placeholder="s3://key:secret@endpoint/bucket?region=auto"
+                      required
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Format: s3://accessKey:secretKey@endpoint/bucket?region=auto</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1.5">Backup Interval (hours)</label>
+                    <input
+                      type="number"
+                      value={intervalHours}
+                      onChange={(e) => setIntervalHours(parseInt(e.target.value) || 24)}
+                      min={1}
+                      max={168}
+                      className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:border-slate-400 focus:ring-0 outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 p-4 pt-0">
+                  <button type="button" onClick={() => setShowConfig(false)} className="flex-1 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200">Cancel</button>
+                  <button type="submit" disabled={configuring} className="flex-1 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-50">
+                    {configuring ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full spin inline-block" /> : "Connect"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Backup History */}
+      {s3Status?.configured && (
+        <div className="bg-white rounded-xl border border-slate-100">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900">Backup History</h3>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setSelectedDb(null)}
+                className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${!selectedDb ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"}`}
+              >
+                All
+              </button>
+              {Object.keys(backupsByDb).map(db => (
+                <button
+                  key={db}
+                  onClick={() => setSelectedDb(db)}
+                  className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${selectedDb === db ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"}`}
+                >
+                  {db}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {backups.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-sm">
+                No backups yet. Click "Backup All" to create your first backup.
+              </div>
+            ) : (
+              backups.slice(0, 20).map((backup, i) => (
+                <div key={backup.key} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
+                      <DbIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-slate-700">{backup.database}</div>
+                      <div className="text-[10px] text-slate-400">
+                        {new Date(backup.timestamp).toLocaleString()} · {fmtBytes(backup.size)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleBackupNow(backup.database)}
+                      disabled={backing}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                      title="Backup now"
+                    >
+                      <UploadIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {backups.length > 20 && (
+            <div className="p-3 border-t border-slate-100 text-center">
+              <span className="text-xs text-slate-400">Showing 20 of {backups.length} backups</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Main App
 const App = () => {
   const [password, setPassword] = useState(localStorage.getItem("pgforge_password") || "");
@@ -905,11 +1291,17 @@ const App = () => {
 
   const dbName = page.startsWith("explorer-") ? page.replace("explorer-", "") : null;
 
+  const renderPage = () => {
+    if (dbName) return <Explorer dbName={dbName} dbs={dbs} password={password} dbStats={dbStats} showToast={showToast} />;
+    if (page === "backups") return <Backups password={password} dbs={dbs} showToast={showToast} />;
+    return <Dashboard dbs={dbs} password={password} period={period} setPeriod={setPeriod} selectedDb={selectedDb} setSelectedDb={setSelectedDb} />;
+  };
+
   return (
     <div className="flex min-h-screen">
       <Sidebar dbs={dbs} dbStats={dbStats} currentPage={page} onNavigate={setPage} onOpenCreate={() => setShowCreate(true)} onOpenImport={() => setShowImport(true)} />
       <main className="flex-1 ml-52 p-6">
-        {dbName ? <Explorer dbName={dbName} dbs={dbs} password={password} dbStats={dbStats} showToast={showToast} /> : <Dashboard dbs={dbs} password={password} period={period} setPeriod={setPeriod} selectedDb={selectedDb} setSelectedDb={setSelectedDb} />}
+        {renderPage()}
       </main>
       <CreateModal isOpen={showCreate} onClose={() => setShowCreate(false)} password={password} onSuccess={loadDbs} showToast={showToast} />
       <ImportModal isOpen={showImport} onClose={() => setShowImport(false)} password={password} onSuccess={loadDbs} showToast={showToast} />

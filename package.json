@@ -1,6 +1,6 @@
 {
   "name": "pgforge",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "Serverless PostgreSQL databases made simple",
   "type": "module",
   "bin": {

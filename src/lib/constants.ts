@@ -5,7 +5,7 @@ import { join } from "path";
 // VERSION
 // =============================================================================
 
-export const VERSION = "2.1.6";
+export const VERSION = "2.2.0";
 export const STATE_VERSION = 1; // Increment when state schema changes
 
 // =============================================================================

@@ -6,6 +6,19 @@ import { getMetrics, getMetricsForPeriod, getMetricsGroupedByDatabase, initMetri
 import { getMachineStats } from "../lib/collector";
 import { create } from "./create";
 import * as ui from "../lib/ui";
+import {
+  getS3Config,
+  saveS3Config,
+  deleteS3Config,
+  parseS3Url,
+  formatS3Url,
+  testS3Connection,
+  listS3Backups,
+  runScheduledBackup,
+  createDatabaseBackup,
+  uploadBackupToS3,
+  type S3Config,
+} from "../lib/s3";
 import { PANEL_HTML } from "../web/panel";
 
 // Dynamic getter for web config file - resolved at runtime after setup
@@ -674,6 +687,199 @@ async function startWebServer(port: number, hostname: string, displayHost: strin
           });
         } catch (err) {
           return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Import failed" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+      }
+
+      // S3 Backup Configuration - GET status
+      if (path === "/api/s3" && req.method === "GET") {
+        try {
+          const s3Config = await getS3Config();
+          if (!s3Config) {
+            return new Response(JSON.stringify({ configured: false }), {
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          }
+
+          // Test connection
+          const connTest = await testS3Connection(s3Config);
+
+          return new Response(JSON.stringify({
+            configured: true,
+            enabled: s3Config.enabled,
+            endpoint: s3Config.endpoint,
+            bucket: s3Config.bucket,
+            region: s3Config.region,
+            intervalHours: s3Config.intervalHours,
+            lastBackup: s3Config.lastBackup,
+            connectionHealthy: connTest.success,
+            connectionError: connTest.error,
+          }), {
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: "Failed to get S3 config" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+      }
+
+      // S3 Backup Configuration - POST configure
+      if (path === "/api/s3" && req.method === "POST") {
+        try {
+          const body = await req.json() as {
+            url?: string;
+            enabled?: boolean;
+            intervalHours?: number;
+          };
+
+          if (body.url) {
+            // Configure new S3 connection
+            const parsed = parseS3Url(body.url);
+            const newConfig: S3Config = {
+              ...parsed,
+              enabled: body.enabled !== false,
+              intervalHours: body.intervalHours || 24,
+              lastBackup: null,
+            };
+
+            // Test connection before saving
+            const connTest = await testS3Connection(newConfig);
+            if (!connTest.success) {
+              return new Response(JSON.stringify({ error: connTest.error || "Connection test failed" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json", ...corsHeaders },
+              });
+            }
+
+            await saveS3Config(newConfig);
+            return new Response(JSON.stringify({ success: true }), {
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          } else {
+            // Update existing config (enable/disable, interval)
+            const existing = await getS3Config();
+            if (!existing) {
+              return new Response(JSON.stringify({ error: "S3 not configured" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json", ...corsHeaders },
+              });
+            }
+
+            if (body.enabled !== undefined) existing.enabled = body.enabled;
+            if (body.intervalHours !== undefined) existing.intervalHours = body.intervalHours;
+
+            await saveS3Config(existing);
+            return new Response(JSON.stringify({ success: true }), {
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          }
+        } catch (err) {
+          return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Failed to configure S3" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+      }
+
+      // S3 Backup Configuration - DELETE remove
+      if (path === "/api/s3" && req.method === "DELETE") {
+        try {
+          await deleteS3Config();
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: "Failed to remove S3 config" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+      }
+
+      // S3 List backups
+      if (path === "/api/s3/backups" && req.method === "GET") {
+        try {
+          const s3Config = await getS3Config();
+          if (!s3Config) {
+            return new Response(JSON.stringify({ error: "S3 not configured" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          }
+
+          const dbName = url.searchParams.get("database") || undefined;
+          const result = await listS3Backups(s3Config, dbName);
+
+          if (!result.success) {
+            return new Response(JSON.stringify({ error: result.error }), {
+              status: 500,
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          }
+
+          return new Response(JSON.stringify(result.backups), {
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: "Failed to list backups" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+      }
+
+      // S3 Run manual backup
+      if (path === "/api/s3/backup" && req.method === "POST") {
+        try {
+          const s3Config = await getS3Config();
+          if (!s3Config) {
+            return new Response(JSON.stringify({ error: "S3 not configured" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          }
+
+          const body = await req.json() as { database?: string };
+          const dbName = body.database;
+
+          if (dbName) {
+            // Backup single database
+            const backupResult = await createDatabaseBackup(dbName);
+            if (!backupResult.success || !backupResult.data) {
+              return new Response(JSON.stringify({ error: backupResult.error || "Backup failed" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json", ...corsHeaders },
+              });
+            }
+
+            const uploadResult = await uploadBackupToS3(s3Config, dbName, backupResult.data);
+            if (!uploadResult.success) {
+              return new Response(JSON.stringify({ error: uploadResult.error || "Upload failed" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json", ...corsHeaders },
+              });
+            }
+
+            // Update last backup time
+            s3Config.lastBackup = new Date().toISOString();
+            await saveS3Config(s3Config);
+
+            return new Response(JSON.stringify({ success: true, key: uploadResult.key }), {
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          } else {
+            // Backup all databases
+            const result = await runScheduledBackup();
+            return new Response(JSON.stringify(result), {
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          }
+        } catch (err) {
+          return new Response(JSON.stringify({ error: "Backup failed" }), {
             status: 500,
             headers: { "Content-Type": "application/json", ...corsHeaders },
           });
