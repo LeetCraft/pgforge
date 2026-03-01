@@ -5,7 +5,7 @@ import { join } from "path";
 // VERSION
 // =============================================================================
 
-export const VERSION = "2.2.0";
+export const VERSION = "2.2.1";
 export const STATE_VERSION = 1; // Increment when state schema changes
 
 // =============================================================================
@@ -134,7 +134,13 @@ export const INTERNAL_NETWORK = "pgforge-internal";
 export const POSTGRES_DEFAULTS = {
   version: "16-alpine",
   maxConnections: 200,
-  sharedBuffers: "128MB",
+  sharedBuffers: "512MB",
+  effectiveCacheSize: "4GB",
+  workMem: "8MB",
+  maintenanceWorkMem: "256MB",
+  walBuffers: "16MB",
+  checkpointCompletionTarget: "0.9",
+  randomPageCost: "1.1",
 } as const;
 
 // PgBouncer settings
@@ -144,4 +150,6 @@ export const PGBOUNCER_DEFAULTS = {
   defaultPoolSize: 20,
   maxClientConn: 1000,
   maxDbConnections: 100,
+  minPoolSize: 5,
+  serverIdleTimeout: 600,
 } as const;

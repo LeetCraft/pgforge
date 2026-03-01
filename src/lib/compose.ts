@@ -65,6 +65,18 @@ services:
       - "-c"
       - "shared_buffers=${POSTGRES_DEFAULTS.sharedBuffers}"
       - "-c"
+      - "effective_cache_size=${POSTGRES_DEFAULTS.effectiveCacheSize}"
+      - "-c"
+      - "work_mem=${POSTGRES_DEFAULTS.workMem}"
+      - "-c"
+      - "maintenance_work_mem=${POSTGRES_DEFAULTS.maintenanceWorkMem}"
+      - "-c"
+      - "wal_buffers=${POSTGRES_DEFAULTS.walBuffers}"
+      - "-c"
+      - "checkpoint_completion_target=${POSTGRES_DEFAULTS.checkpointCompletionTarget}"
+      - "-c"
+      - "random_page_cost=${POSTGRES_DEFAULTS.randomPageCost}"
+      - "-c"
       - "listen_addresses=*"
 
 networks:
@@ -109,6 +121,18 @@ services:
       - "-c"
       - "shared_buffers=${POSTGRES_DEFAULTS.sharedBuffers}"
       - "-c"
+      - "effective_cache_size=${POSTGRES_DEFAULTS.effectiveCacheSize}"
+      - "-c"
+      - "work_mem=${POSTGRES_DEFAULTS.workMem}"
+      - "-c"
+      - "maintenance_work_mem=${POSTGRES_DEFAULTS.maintenanceWorkMem}"
+      - "-c"
+      - "wal_buffers=${POSTGRES_DEFAULTS.walBuffers}"
+      - "-c"
+      - "checkpoint_completion_target=${POSTGRES_DEFAULTS.checkpointCompletionTarget}"
+      - "-c"
+      - "random_page_cost=${POSTGRES_DEFAULTS.randomPageCost}"
+      - "-c"
       - "listen_addresses=*"
       - "-c"
       - "password_encryption=md5"
@@ -123,6 +147,8 @@ services:
       DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULTS.defaultPoolSize}
       MAX_CLIENT_CONN: ${PGBOUNCER_DEFAULTS.maxClientConn}
       MAX_DB_CONNECTIONS: ${PGBOUNCER_DEFAULTS.maxDbConnections}
+      MIN_POOL_SIZE: ${PGBOUNCER_DEFAULTS.minPoolSize}
+      SERVER_IDLE_TIMEOUT: ${PGBOUNCER_DEFAULTS.serverIdleTimeout}
       AUTH_TYPE: md5
       IGNORE_STARTUP_PARAMETERS: extra_float_digits
     ports:
